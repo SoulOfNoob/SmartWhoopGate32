@@ -5,6 +5,7 @@
 #include <WebServer.h>
 #include <AutoConnect.h>
 #include <PubSubClient.h>
+#include <WebOTA.h>
 
 #define NUM_LEDS 90
 #define DATA_PIN 13
@@ -59,12 +60,12 @@ void setup()
     //create a task that will be executed in the Task2code() function, with priority 1 and executed on core 1
     xTaskCreatePinnedToCore(
         Task2code, /* Task function. */
-        "Task2",     /* name of task. */
-        10000,         /* Stack size of task */
-        NULL,            /* parameter of the task */
-        1,                 /* priority of the task */
-        &Task2,        /* Task handle to keep track of created task */
-        1);                /* pin task to core 1 */
+        "Task2",   /* name of task. */
+        10000,     /* Stack size of task */
+        NULL,      /* parameter of the task */
+        1,         /* priority of the task */
+        &Task2,    /* Task handle to keep track of created task */
+        1);        /* pin task to core 1 */
     delay(500);
 }
 
@@ -171,15 +172,13 @@ void Task2code(void *pvParameters)
     for (;;)
     {
         if (!client.connected())
-            {
-                reconnect();
-            }
+        {
+            reconnect();
+        }
         client.loop();
 
-        long now = millis();
-        if (now - lastMsg > 5000)
+        EVERY_N_MILLISECONDS(5000) 
         {
-            lastMsg = now;
             client.publish("jryesp32/output", "still alive");
         }
     }
