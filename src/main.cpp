@@ -2,6 +2,8 @@
 #include <FastLED.h>
 #include <RX5808.h>
 #include <WiFi.h>
+#include <WebServer.h>
+#include <AutoConnect.h>
 #include <PubSubClient.h>
 
 #define NUM_LEDS 90
@@ -9,8 +11,8 @@
 
 CRGB leds[NUM_LEDS];
 
-const char *ssid = "SSID";
-const char *password = "PASS";
+// const char *ssid = "SSID";
+// const char *password = "PASS";
 const char *mqtt_server = "broker.hivemq.com";
 
 WiFiClient espClient;
@@ -25,7 +27,11 @@ TaskHandle_t Task2;
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
 void setup_wifi();
+void rootPage();
 void callback(char *topic, byte *message, unsigned int length);
+
+WebServer Server; // Replace with WebServer for ESP32
+AutoConnect Portal(Server);
 
 void setup()
 {
@@ -65,23 +71,31 @@ void setup()
 void setup_wifi()
 {
     delay(10);
-    // We start by connecting to a WiFi network
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-
-    WiFi.begin(ssid, password);
-
-    while (WiFi.status() != WL_CONNECTED)
+    Serial.println("new wifi stuff");
+    Server.on("/", rootPage);
+    if (Portal.begin())
     {
-        delay(500);
-        Serial.print(".");
+        Serial.println("WiFi connected: " + WiFi.localIP().toString());
     }
+    Serial.println("new wifi stuff done");
 
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+    // // We start by connecting to a WiFi network
+    // Serial.println();
+    // Serial.print("Connecting to ");
+    // Serial.println(ssid);
+
+    // WiFi.begin(ssid, password);
+
+    // while (WiFi.status() != WL_CONNECTED)
+    // {
+    //     delay(500);
+    //     Serial.print(".");
+    // }
+
+    // Serial.println("");
+    // Serial.println("WiFi connected");
+    // Serial.println("IP address: ");
+    // Serial.println(WiFi.localIP());
 }
 
 void callback(char *topic, byte *message, unsigned int length)
@@ -126,6 +140,12 @@ void reconnect()
     }
 }
 
+void rootPage()
+{
+    char content[] = "Hello, world";
+    Server.send(200, "text/plain", content);
+}
+
 //Task1code: blinks an LED every 1000 ms
 void Task1code(void *pvParameters)
 {
@@ -167,5 +187,5 @@ void Task2code(void *pvParameters)
 
 void loop()
 {
-
+    Portal.handleClient();
 }
