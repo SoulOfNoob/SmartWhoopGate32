@@ -9,20 +9,10 @@
 #define NUM_LEDS 90
 #define DATA_PIN 13
 
-#define SOFTWARE_VERSION 1
-
-// Provide server name, path to metadata file and polling interval for OTA updates.
-#define OTA_SERVER_HOST_NAME "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master"
-#define OTA_SERVER_METADATA_PATH "/esp32/ota.txt"
-#define OTA_POLLING_INTERVAL_S 5
-#define OTA_AUTO_REBOOT 1
-
-#define CONFIG_FIRMWARE_UPGRADE_URL "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/firmware.bin"
+#define CONFIG_FIRMWARE_UPGRADE_URL "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.bin"
 
 extern const char github_pem_start[] asm("_binary_certs_github_pem_start");
 extern const char digicert_pem_start[] asm("_binary_certs_digicert_pem_start");
-
-//const char *fwurl = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/firmware.bin";
 
 CRGB leds[NUM_LEDS];
 
@@ -223,7 +213,7 @@ esp_err_t do_firmware_upgrade()
     Serial.println("downloading and installing new firmware ...");
 
     esp_http_client_config_t config = { };
-    config.url = "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/compiled/esp32/firmware.bin";
+    config.url = CONFIG_FIRMWARE_UPGRADE_URL;
     config.cert_pem = digicert_pem_start;
 
     esp_err_t ret = esp_https_ota(&config);
