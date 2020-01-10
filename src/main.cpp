@@ -148,11 +148,13 @@ void evaluateMessage(String message)
     {
         Serial.println("Turning LEDs ON");
         ledOn = true;
+        client.publish("jryesp32/output", "LEDs ON");
     }
     else if (message.indexOf("OFF") >= 0)
     {
         Serial.println("Turning LEDs OFF");
         ledOn = false;
+        client.publish("jryesp32/output", "LEDs OFF");
     }
     else if (message.indexOf("UPDATE") >= 0)
     {
@@ -174,7 +176,7 @@ void reconnect()
             // Subscribe
             client.subscribe("jryesp32/cmd");
             Serial.println("subscribed");
-            client.publish("jryesp32/output", "bin da");
+            client.publish("jryesp32/output", "Ready to Receive");
             Serial.println("published");
         }
         else
@@ -254,6 +256,7 @@ esp_err_t do_firmware_upgrade()
     if (ret == ESP_OK)
     {
         Serial.println("OTA OK, restarting...");
+        client.publish("jryesp32/output", "Update Done");
         esp_restart();
     }
     else
