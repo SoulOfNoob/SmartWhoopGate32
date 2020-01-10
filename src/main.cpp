@@ -2,18 +2,30 @@
 #include <FastLED.h>
 #include <RX5808.h>
 #include <WiFi.h>
-#include <WebServer.h>
-#include <AutoConnect.h>
 #include <PubSubClient.h>
-#include <WebOTA.h>
+#include <esp_https_ota.h>
 
 #define NUM_LEDS 90
 #define DATA_PIN 13
 
+#define SOFTWARE_VERSION 1
+
+// Provide server name, path to metadata file and polling interval for OTA updates.
+#define OTA_SERVER_HOST_NAME "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master"
+#define OTA_SERVER_METADATA_PATH "/esp32/ota.txt"
+#define OTA_POLLING_INTERVAL_S 5
+#define OTA_AUTO_REBOOT 1
+
+#define CONFIG_FIRMWARE_UPGRADE_URL "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/firmware.bin"
+
+extern const uint8_t private_pem_key_start[] asm("_binary_certs_github_pem_start");
+
+//const char *fwurl = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/firmware.bin";
+
 CRGB leds[NUM_LEDS];
 
-// const char *ssid = "SSID";
-// const char *password = "PASS";
+const char *ssid = "SSID";
+const char *password = "PASS";
 const char *mqtt_server = "broker.hivemq.com";
 
 WiFiClient espClient;
@@ -28,11 +40,8 @@ TaskHandle_t Task2;
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
 void setup_wifi();
-void rootPage();
 void callback(char *topic, byte *message, unsigned int length);
-
-WebServer Server; // Replace with WebServer for ESP32
-AutoConnect Portal(Server);
+void do_firmware_upgrade();
 
 void setup()
 {
@@ -72,31 +81,23 @@ void setup()
 void setup_wifi()
 {
     delay(10);
-    Serial.println("new wifi stuff");
-    Server.on("/", rootPage);
-    if (Portal.begin())
+    // We start by connecting to a WiFi network
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED)
     {
-        Serial.println("WiFi connected: " + WiFi.localIP().toString());
+        delay(500);
+        Serial.print(".");
     }
-    Serial.println("new wifi stuff done");
 
-    // // We start by connecting to a WiFi network
-    // Serial.println();
-    // Serial.print("Connecting to ");
-    // Serial.println(ssid);
-
-    // WiFi.begin(ssid, password);
-
-    // while (WiFi.status() != WL_CONNECTED)
-    // {
-    //     delay(500);
-    //     Serial.print(".");
-    // }
-
-    // Serial.println("");
-    // Serial.println("WiFi connected");
-    // Serial.println("IP address: ");
-    // Serial.println(WiFi.localIP());
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
 }
 
 void callback(char *topic, byte *message, unsigned int length)
@@ -141,12 +142,6 @@ void reconnect()
     }
 }
 
-void rootPage()
-{
-    char content[] = "Hello, world";
-    Server.send(200, "text/plain", content);
-}
-
 //Task1code: blinks an LED every 1000 ms
 void Task1code(void *pvParameters)
 {
@@ -179,12 +174,38 @@ void Task2code(void *pvParameters)
 
         EVERY_N_MILLISECONDS(5000) 
         {
+            Serial.print("sending mqtt");
             client.publish("jryesp32/output", "still alive");
+        }
+        EVERY_N_SECONDS(10)
+        {
+            Serial.print("firmware upgrade");
+            do_firmware_upgrade();
         }
     }
 }
 
 void loop()
 {
-    Portal.handleClient();
+    
+}
+
+void do_firmware_upgrade()
+{
+    Serial.println("downloading and installing new firmware (%s)...");
+
+    esp_http_client_config_t ota_client_config;
+        ota_client_config.url = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/esp32/firmware.bin";
+        ota_client_config.cert_pem = (char *)private_pem_key_start;
+    
+    esp_err_t ret = esp_https_ota(&ota_client_config);
+    if (ret == ESP_OK)
+    {
+        Serial.println("OTA OK, restarting...");
+        esp_restart();
+    }
+    else
+    {
+        Serial.println("OTA failed...");
+    }
 }

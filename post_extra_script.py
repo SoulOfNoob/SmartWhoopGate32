@@ -22,8 +22,7 @@ env.Append(CPPDEFINES=("VECT_TAB_ADDR", 0x123456789))
 
 def after_build(source, target, env):
     print("after_build")
-    print("copy: .pio/build/esp32doit-devkit-v1/firmware.bin TO compiled/firmware.bin")
-    copyfile(".pio/build/esp32doit-devkit-v1/firmware.bin", "compiled/firmware.bin")
-
+    print("copy: .pio/build/esp32doit-devkit-v1/firmware.bin TO compiled/esp32/firmware.bin")
+    copyfile(".pio/build/esp32doit-devkit-v1/firmware.bin", "compiled/esp32/firmware.bin")
 
 env.AddPostAction("buildprog", after_build)
