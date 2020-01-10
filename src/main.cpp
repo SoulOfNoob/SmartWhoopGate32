@@ -18,7 +18,8 @@
 
 #define CONFIG_FIRMWARE_UPGRADE_URL "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/firmware.bin"
 
-extern const uint8_t private_pem_key_start[] asm("_binary_certs_github_pem_start");
+extern const char github_pem_start[] asm("_binary_certs_github_pem_start");
+extern const char digicert_pem_start[] asm("_binary_certs_digicert_pem_start");
 
 //const char *fwurl = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/firmware.bin";
 
@@ -41,7 +42,7 @@ void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
 void setup_wifi();
 void callback(char *topic, byte *message, unsigned int length);
-void do_firmware_upgrade();
+esp_err_t do_firmware_upgrade();
 
 void setup()
 {
@@ -54,6 +55,9 @@ void setup()
     client.setCallback(callback);
 
     RX5808::init();
+
+    //Serial.println((char *)github_pem_start);
+    do_firmware_upgrade();
 
     //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
     xTaskCreatePinnedToCore(
@@ -177,11 +181,6 @@ void Task2code(void *pvParameters)
             Serial.print("sending mqtt");
             client.publish("jryesp32/output", "still alive");
         }
-        EVERY_N_SECONDS(10)
-        {
-            Serial.print("firmware upgrade");
-            do_firmware_upgrade();
-        }
     }
 }
 
@@ -190,15 +189,16 @@ void loop()
     
 }
 
-void do_firmware_upgrade()
+esp_err_t do_firmware_upgrade()
 {
-    Serial.println("downloading and installing new firmware (%s)...");
+    Serial.println("downloading and installing new firmware ...");
 
-    esp_http_client_config_t ota_client_config;
-        ota_client_config.url = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/esp32/firmware.bin";
-        ota_client_config.cert_pem = (char *)private_pem_key_start;
-    
-    esp_err_t ret = esp_https_ota(&ota_client_config);
+    esp_http_client_config_t config = { };
+    config.url = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/esp32/firmware.bin";
+    config.cert_pem = digicert_pem_start;
+
+    esp_err_t ret = esp_https_ota(&config);
+    Serial.println("if: ");
     if (ret == ESP_OK)
     {
         Serial.println("OTA OK, restarting...");
@@ -207,5 +207,7 @@ void do_firmware_upgrade()
     else
     {
         Serial.println("OTA failed...");
+        return ESP_FAIL;
     }
+    return ESP_OK;
 }

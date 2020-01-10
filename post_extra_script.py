@@ -24,5 +24,6 @@ def after_build(source, target, env):
     print("after_build")
     print("copy: .pio/build/esp32doit-devkit-v1/firmware.bin TO compiled/esp32/firmware.bin")
     copyfile(".pio/build/esp32doit-devkit-v1/firmware.bin", "compiled/esp32/firmware.bin")
+    copyfile(".pio/build/esp32doit-devkit-v1/firmware.elf", "compiled/esp32/firmware.elf")
 
 env.AddPostAction("buildprog", after_build)
