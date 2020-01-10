@@ -29,6 +29,7 @@ const char *ssid = "SSID";
 const char *password = "PASS";
 const char *mqtt_server = "broker.hivemq.com";
 
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 long lastMsg = 0;
@@ -178,7 +179,7 @@ void Task2code(void *pvParameters)
 
         EVERY_N_MILLISECONDS(5000) 
         {
-            Serial.print("sending mqtt");
+            Serial.println("sending mqtt");
             client.publish("jryesp32/output", "still alive");
         }
     }
@@ -194,11 +195,11 @@ esp_err_t do_firmware_upgrade()
     Serial.println("downloading and installing new firmware ...");
 
     esp_http_client_config_t config = { };
-    config.url = "https://github.com/SoulOfNoob/SmartWhoopGate32/raw/master/compiled/esp32/firmware.bin";
+    config.url = "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/compiled/esp32/firmware.bin";
     config.cert_pem = digicert_pem_start;
 
     esp_err_t ret = esp_https_ota(&config);
-    Serial.println("if: ");
+
     if (ret == ESP_OK)
     {
         Serial.println("OTA OK, restarting...");
