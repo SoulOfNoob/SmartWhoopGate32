@@ -37,7 +37,7 @@ void RX5808::init()
     debug = false;
     ledTime = 0;
 
-    Serial.println(F("START:"));
+    Serial.print("RX5808 Init()");
     setupSPIpins();
     maxRssi[0] = 3000;
     maxRssi[1] = 3000;
@@ -79,6 +79,7 @@ void RX5808::init()
     // FastLED.setBrightness(200);
 
     RX5808::setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
+    Serial.println("...done");
 }
 
 void RX5808::setupSPIpins()
