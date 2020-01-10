@@ -42,13 +42,16 @@ long lastMsg = 0;
 char msg[50];
 int value = 0;
 
-TaskHandle_t Task1;
+bool ledOn = false;
+
+    TaskHandle_t Task1;
 TaskHandle_t Task2;
 
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
 void setup_wifi();
 void callback(char *topic, byte *message, unsigned int length);
+void evaluateMessage(String message);
 esp_err_t do_firmware_upgrade();
 
 void setup()
@@ -75,8 +78,7 @@ void setup()
 
     RX5808::init();
 
-    //Serial.println((char *)github_pem_start);
-    do_firmware_upgrade();
+    //do_firmware_upgrade();
 
     //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
     xTaskCreatePinnedToCore(
@@ -136,6 +138,27 @@ void callback(char *topic, byte *message, unsigned int length)
         messageTemp += (char)message[i];
     }
     Serial.println();
+
+    evaluateMessage(messageTemp);
+}
+
+void evaluateMessage(String message)
+{   
+    if (message.indexOf("ON") >= 0)
+    {
+        Serial.println("Turning LEDs ON");
+        ledOn = true;
+    }
+    else if (message.indexOf("OFF") >= 0)
+    {
+        Serial.println("Turning LEDs OFF");
+        ledOn = false;
+    }
+    else if (message.indexOf("UPDATE") >= 0)
+    {
+        Serial.println("Trying Update");
+        do_firmware_upgrade();
+    }
 }
 
 void reconnect()
@@ -149,7 +172,7 @@ void reconnect()
         {
             Serial.println("connected");
             // Subscribe
-            client.subscribe("jryesp32/input");
+            client.subscribe("jryesp32/cmd");
             Serial.println("subscribed");
             client.publish("jryesp32/output", "bin da");
             Serial.println("published");
@@ -173,11 +196,17 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {
-        RX5808::checkRssi();
-        RX5808::checkDroneNear();
-        RX5808::setDroneColor(NUM_LEDS, leds);
-        FastLED.setBrightness(RX5808::brightness);
-        FastLED.show();
+
+        if(ledOn){
+            RX5808::checkRssi();
+            RX5808::checkDroneNear();
+            RX5808::setDroneColor(NUM_LEDS, leds);
+            FastLED.setBrightness(RX5808::brightness);
+            FastLED.show();
+        }else{
+            FastLED.setBrightness(0);
+            FastLED.show();
+        }
     }
 }
 
@@ -195,10 +224,14 @@ void Task2code(void *pvParameters)
         }
         client.loop();
 
-        EVERY_N_MILLISECONDS(5000) 
+        EVERY_N_SECONDS(30) 
         {
             Serial.println("sending mqtt");
             client.publish("jryesp32/output", "still alive");
+        }
+        EVERY_N_HOURS(24)
+        {
+            do_firmware_upgrade();
         }
     }
 }
