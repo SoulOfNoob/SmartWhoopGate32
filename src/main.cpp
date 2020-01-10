@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <esp_https_ota.h>
+#include <config.h>
 
 #define NUM_LEDS 90
 #define DATA_PIN 13
@@ -25,10 +26,25 @@ extern const char digicert_pem_start[] asm("_binary_certs_digicert_pem_start");
 
 CRGB leds[NUM_LEDS];
 
-const char *ssid = "SSID";
-const char *password = "PASS";
-const char *mqtt_server = "broker.hivemq.com";
+// const char *ssid = "SSID";
+// const char *password = "PASS";
+// const char *mqtt_server = "broker.hivemq.com";
 
+#ifndef WIFI_SSID
+    #define WIFI_SSID "BBT";
+#endif
+
+#ifndef WIFI_PASS
+    #define WIFI_PASS "Gerhofhh19!";
+#endif
+
+#ifndef MQTT_BROKER
+    #define MQTT_BROKER "broker.hivemq.com";
+#endif
+
+const char *ssid = WIFI_SSID;
+const char *password = WIFI_PASS;
+const char *mqtt_server = MQTT_BROKER;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -50,6 +66,18 @@ void setup()
     // put your setup code here, to run once:
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     Serial.begin(115200);
+    
+    Serial.println();
+    Serial.println();
+    Serial.println();
+
+    for (uint8_t t = 4; t > 0; t--)
+    {
+        Serial.printf("[SETUP] WAIT %d...\n", t);
+        Serial.flush();
+        delay(1000);
+    }
+    Serial.println("Firmware Version: 0.2");
 
     setup_wifi();
     client.setServer(mqtt_server, 1883);
