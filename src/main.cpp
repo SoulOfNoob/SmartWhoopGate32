@@ -128,7 +128,7 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     {
         Serial.println("Trying Update");
         const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
-        System::do_firmware_upgrade(url, NULL);
+        System::do_firmware_upgrade(url, digicert_pem_start);
     }
 }
 
