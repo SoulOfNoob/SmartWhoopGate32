@@ -21,6 +21,9 @@
   - SET
     - NAME
       - `EEPROM SET NAME <Gate10>`
+    - NETWORK
+      - []
+        - `EEPROM SET NETWORK [0] <ssid:pass:mqtt>`
 - UPDATE
   - `UPDATE`
 - RESTART

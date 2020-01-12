@@ -77,7 +77,7 @@ void System::setup_wifi(PersistentData *persistentData)
         {
             Serial.println("");
             Serial.println("Unable to connect trying next Network");
-            if(selectedNetwork < 2)
+            if(selectedNetwork < 3)
             {
                 selectedNetwork++;
             }
@@ -125,7 +125,7 @@ void System::reconnect()
         Serial.print("Attempting MQTT connection...");
         // Attempt to connect
         String clientName = espid + "_Client";
-        if (mqttClient.connect(clientName.c_str()))
+        if (mqttClient.connect(fallbackId.c_str()))
         {
             Serial.println("connected");
             // Subscribe

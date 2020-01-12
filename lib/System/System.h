@@ -5,7 +5,7 @@
 #include <PubSubClient.h>
 
 #define UPDATE_JSON_URL "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.json"
-#define FIRMWARE_VERSION 0.8
+#define FIRMWARE_VERSION 0.9
 
 struct NetworkData
 {
@@ -17,7 +17,7 @@ struct NetworkData
 struct PersistentData
 {
     String espid;
-    NetworkData networks[3];
+    NetworkData networks[4];
 };
 
 class System

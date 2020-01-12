@@ -55,7 +55,7 @@ void setup()
     Serial.println(FIRMWARE_VERSION);
 
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-
+    //initCustomEEPROM();
     persistentData = loadEEPROM();
 
     // init librarys
@@ -195,7 +195,11 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     }
     else if (messageTemp.indexOf("EEPROM") >= 0)
     {
-        if (messageTemp.indexOf("SET") >= 0)
+        if (messageTemp.indexOf("RESET") >= 0)
+        {
+            initCustomEEPROM();
+        }
+        else if (messageTemp.indexOf("SET") >= 0)
         {
             if (messageTemp.indexOf("NAME") >= 0)
             {
@@ -215,6 +219,49 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
                     {
                         System::mqttClient.publish(System::statusTopic.c_str(), "Invalid value");
                     }
+                }
+                else
+                {
+                    System::mqttClient.publish(System::statusTopic.c_str(), "Invalid format");
+                }
+            }
+            if (messageTemp.indexOf("NETWORK") >= 0)
+            {
+                int networkStart = messageTemp.indexOf("[");
+                int valueStart = messageTemp.indexOf("<");
+                int valueEnd = messageTemp.indexOf(">");
+
+                if (networkStart > 0 && valueStart > 0 && valueEnd > 0)
+                {
+                    int network = messageTemp.substring(networkStart + 1, networkStart + 2).toInt();
+
+                    int seperator1 = messageTemp.indexOf(":");
+                    int seperator2 = messageTemp.indexOf(":", seperator1+1);
+
+                    String ssid = messageTemp.substring(valueStart + 1, seperator1);
+                    String pass = messageTemp.substring(seperator1 + 1, seperator2);
+                    String mqtt = messageTemp.substring(seperator2 + 1, valueEnd);
+
+                    if (ssid.length() > 0 && pass.length() > 0 && mqtt.length() > 0)
+                    {
+                        ssid.toCharArray(persistentData.networks[network].ssid, 32);
+                        Serial.print("ssid: ");
+                        Serial.println(ssid);
+                        pass.toCharArray(persistentData.networks[network].pass, 32);
+                        Serial.print("pass: ");
+                        Serial.println(pass);
+                        mqtt.toCharArray(persistentData.networks[network].mqtt, 32);
+                        Serial.print("mqtt: ");
+                        Serial.println(mqtt);
+                        saveEEPROM(persistentData);
+                        System::mqttClient.publish(System::statusTopic.c_str(), "Set");
+                    }
+                    else
+                    {
+                        System::mqttClient.publish(System::statusTopic.c_str(), "Invalid Value");
+                    }
+                    
+                    
                 }
                 else
                 {
@@ -268,6 +315,7 @@ void Task1code(void *pvParameters)
 
 void loop()
 {
+    delay(100);
     if (!System::mqttClient.connected())
     {
         System::reconnect();
@@ -386,7 +434,7 @@ void printEEPROM(PersistentData eData)
     Serial.println(eData.networks[2].mqtt);
 }
 
-// remove for commit
+// Default config
 void initCustomEEPROM()
 {
     Animations::circle(leds, CRGB::Blue);
