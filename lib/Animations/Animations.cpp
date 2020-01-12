@@ -61,6 +61,7 @@ void Animations::off(CRGB *leds)
 
 void Animations::circle(CRGB *leds, CRGB color)
 {
+    delay(100);
     FastLED.clear();
     FastLED.setBrightness(brightness);
     for (int led = 0; led < NUM_LEDS; led++)
@@ -78,6 +79,7 @@ void Animations::circle(CRGB *leds, CRGB color)
         delay(10);
     }
     FastLED.clear();
+    delay(100);
 }
 
 // void clearArray(CRGB *leds)
