@@ -23,7 +23,7 @@ void System::init(PersistentData *persistentData)
 
 void System::setup_wifi(PersistentData *persistentData)
 {
-    uint8_t selectedNetwork = 0;
+    uint8_t selectedNetwork = 1;    // manual override
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.println();
@@ -81,8 +81,8 @@ void System::reconnect()
         {
             Serial.println("connected");
             // Subscribe
-            mqttClient.subscribe("Gates");
-            Serial.println("subscribed to: Gates");
+            mqttClient.subscribe("Gates/cmd");
+            Serial.println("subscribed to: Gates/cmd");
             mqttClient.subscribe(System::cmdTopic.c_str());
             Serial.print("subscribed to: ");
             Serial.println(System::cmdTopic);

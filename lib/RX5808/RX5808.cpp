@@ -20,6 +20,7 @@ int RX5808::maxRssiTime[8];
 int RX5808::ledTime;
 
 bool RX5808::offset = false;
+bool RX5808::autoReset = true;
 
 const uint16_t channelFreqTable[] PROGMEM = {
     5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917, // Raceband
@@ -233,6 +234,11 @@ void RX5808::setModuleFrequency(uint16_t frequency)
     delay(MIN_TUNE_TIME);
 }
 
+void RX5808::resetMaxRssi(uint8_t channel){
+    maxRssiTime[channel] = millis();
+    maxRssi[channel] = 3000;
+}
+
 void RX5808::checkRssi()
 {
     for (int i = 0; i < 8; i++)
@@ -244,10 +250,8 @@ void RX5808::checkRssi()
         {
             maxRssi[i] = rssi[i];
         }
-        if (millis() > maxRssiTime[i] + 30000)
-        {
-            maxRssiTime[i] = millis();
-            maxRssi[i] = 3000;
+        if(autoReset){
+            RX5808::resetMaxRssi(i);
         }
         if ((rssi[i] >= 2000 && debug))
         {

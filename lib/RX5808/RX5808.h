@@ -5,12 +5,16 @@ class RX5808
 {
 public:
     static void init();
+    static void resetMaxRssi(uint8_t channel);
     static void checkRssi();
     static void checkDroneNear();
     static int getNearestDrone();
     static void setDroneColor(CRGB *leds);
 
     static byte defaultBrightness;
+    static bool autoReset;
+
+    static int maxRssi[8];
 
 private:
     static void setupSPIpins();
@@ -26,7 +30,6 @@ private:
     static bool droneNear[8];
     static int droneNearTime[8];
     static bool debug;
-    static int maxRssi[8];
     static int maxRssiTime[8];
     static int ledTime;
     static bool offset;

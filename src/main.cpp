@@ -33,6 +33,7 @@ void Task2code(void *pvParameters);
 void evaluateMQTTMessage(char *topic, byte *message, unsigned int length);
 void saveEEPROM(PersistentData argument);
 PersistentData loadEEPROM();
+void printMaxRssi();
 void printEEPROM(PersistentData persistentData);
 
 // Functions
@@ -123,17 +124,70 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     }
     Serial.println();
 
-    if (messageTemp.indexOf("ON") >= 0)
+    if (messageTemp.indexOf("LED") >= 0)
     {
-        Serial.println("Turning LEDs ON");
-        mode = 3;
-        System::mqttClient.publish(System::statusTopic.c_str(), "LEDs ON");
+        if (messageTemp.indexOf("ON") >= 0)
+        {
+            Serial.println("Turning LEDs ON");
+            mode = 3;
+            System::mqttClient.publish(System::statusTopic.c_str(), "LEDs ON");
+        }
+        else if (messageTemp.indexOf("OFF") >= 0)
+        {
+            Serial.println("Turning LEDs OFF");
+            mode = 2;
+            System::mqttClient.publish(System::statusTopic.c_str(), "LEDs OFF");
+        }
     }
-    else if (messageTemp.indexOf("OFF") >= 0)
+    // SETMAXRSSI [1] = <1234>"
+    else if (messageTemp.indexOf("MAXRSSI") >= 0)
     {
-        Serial.println("Turning LEDs OFF");
-        mode = 2;
-        System::mqttClient.publish(System::statusTopic.c_str(), "LEDs OFF");
+        if (messageTemp.indexOf("AUTORESET") >= 0)
+        {
+            if (messageTemp.indexOf("ON") >= 0)
+            {
+                Serial.println("Turning AUTORESET ON");
+                RX5808::autoReset = true;
+                System::mqttClient.publish(System::statusTopic.c_str(), "AUTORESET ON");
+            }
+            else if (messageTemp.indexOf("OFF") >= 0)
+            {
+                Serial.println("Turning AUTORESET OFF");
+                RX5808::autoReset = false;
+                System::mqttClient.publish(System::statusTopic.c_str(), "AUTORESET OFF");
+            }
+        }
+        else if (messageTemp.indexOf("RESET") >= 0)
+        {
+            for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
+            
+        }
+        else if (messageTemp.indexOf("SET") >= 0)
+        {
+            int channelStart = messageTemp.indexOf("[");
+            int valueStart = messageTemp.indexOf("<");
+            int valueEnd = messageTemp.indexOf(">");
+
+            if (channelStart > 0 && valueStart > 0 && valueEnd > 0)
+            {
+                int channel = messageTemp.substring(channelStart + 1, channelStart + 2).toInt();
+                int value = messageTemp.substring(valueStart + 1, valueEnd).toInt();
+                if (channel >= 0 && value >= 0)
+                {
+                    RX5808::maxRssi[channel] = value;
+                    System::mqttClient.publish(System::statusTopic.c_str(), "Set");
+                }
+                else
+                {
+                    System::mqttClient.publish(System::statusTopic.c_str(), "Invalid value");
+                }
+            }
+            else
+            {
+                System::mqttClient.publish(System::statusTopic.c_str(), "Invalid format");
+            }
+        }
+        printMaxRssi();
     }
     else if (messageTemp.indexOf("UPDATE") >= 0)
     {
@@ -157,29 +211,26 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {
-        switch (mode)
+        if(mode == 1)
         {
-            case 1:
-                //loadEEPROM();
-                Animations::startup(leds);
-                mode = 2;
-                break;
-
-            case 2:
-                Animations::off(leds);
-                mode = 9;
-                break;
-
-            case 3:
-                RX5808::checkRssi();
-                RX5808::checkDroneNear();
-                Animations::setChannelColor(leds, RX5808::getNearestDrone());
-                RX5808::setDroneColor(leds);
-                break;
-
-            default:
-                delay(10);
-                break;
+            Animations::startup(leds);
+            mode = 2;
+        }
+        else if(mode == 2)
+        {
+            Animations::off(leds);
+            mode = 9;
+        }
+        else if(mode == 3)
+        {
+            RX5808::checkRssi();
+            RX5808::checkDroneNear();
+            Animations::setChannelColor(leds, RX5808::getNearestDrone());
+            RX5808::setDroneColor(leds);
+        }
+        else
+        {
+            delay(10);
         }
     }
 }
@@ -197,6 +248,12 @@ void loop()
     //     Serial.print("loop() running on core ");
     //     Serial.println(xPortGetCoreID());
     // }
+    if(mode == 3){
+        EVERY_N_SECONDS(1)
+        {
+            printMaxRssi();
+        }
+    }
     EVERY_N_MINUTES(5)
     {
         Serial.println("sending mqtt");
@@ -239,6 +296,20 @@ PersistentData loadEEPROM()
         eData = {};
     }
     return eData;
+}
+
+void printMaxRssi()
+{
+    int *maxRssi = RX5808::maxRssi;
+    String values = "Values: ";
+    for( int i = 0 ; i < 8 ; i++ )
+    {
+        values += i;
+        values += ": ";
+        values += maxRssi[i];
+        values += ", ";
+    }
+    System::mqttClient.publish(System::statusTopic.c_str(), values.c_str());
 }
 
 void printEEPROM(PersistentData eData)
