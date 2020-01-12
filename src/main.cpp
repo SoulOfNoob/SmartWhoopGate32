@@ -31,6 +31,7 @@ PersistentData persistentData;
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
 void evaluateMQTTMessage(char *topic, byte *message, unsigned int length);
+void checkUpdate();
 void saveEEPROM(PersistentData argument);
 PersistentData loadEEPROM();
 void printMaxRssi();
@@ -49,7 +50,7 @@ void setup()
     }
     Serial.print("setup() running on core ");
     Serial.println(xPortGetCoreID());
-    Serial.println("Firmware Version: 0.4");
+    Serial.println("Firmware Version: 0.5");
 
     persistentData = loadEEPROM();
 
@@ -191,11 +192,7 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     }
     else if (messageTemp.indexOf("UPDATE") >= 0)
     {
-        mode = 9;
-        Animations::off(leds);
-        Animations::update(leds);
-        const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
-        System::do_firmware_upgrade(url, digicert_pem_start);
+        checkUpdate();
     }
     else if (messageTemp.indexOf("RESTART") >= 0)
     {
@@ -259,15 +256,31 @@ void loop()
         Serial.println("sending mqtt");
         System::mqttClient.publish("smartwhoopgates32/output", "still alive");
     }
-    EVERY_N_HOURS(24)
+    EVERY_N_MINUTES(5)
     {
-        //mode = 9;
-        //Animations::update(leds);
-        const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
-        System::do_firmware_upgrade(url, digicert_pem_start);
+        checkUpdate();
     }
 
     ArduinoOTA.handle();
+}
+
+void checkUpdate()
+{
+    char *url = System::checkForUpdate(digicert_pem_start);
+    Serial.print("url: ");
+    Serial.println(url);
+    if (strlen(url) != 0)
+    {
+        mode = 9;
+        Animations::off(leds);
+        Animations::update(leds);
+        //const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
+        System::do_firmware_upgrade(url, digicert_pem_start);
+    }
+    else
+    {
+        Serial.println("No File");
+    }
 }
 
 void saveEEPROM(PersistentData eData)

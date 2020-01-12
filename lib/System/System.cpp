@@ -2,6 +2,7 @@
 #include <config.h>
 #include <System.h>
 #include <WiFi.h>
+#include "cJSON.h"
 #include <esp_https_ota.h>
 #include <PubSubClient.h>
 
@@ -14,6 +15,36 @@ String System::espid;
 String System::cmdTopic;
 String System::statusTopic;
 
+// receive buffer
+char System::rcv_buffer[200];
+
+// esp_http_client event handler
+esp_err_t System::_http_event_handler(esp_http_client_event_t *evt)
+{
+    switch (evt->event_id)
+    {
+    case HTTP_EVENT_ERROR:
+        break;
+    case HTTP_EVENT_ON_CONNECTED:
+        break;
+    case HTTP_EVENT_HEADER_SENT:
+        break;
+    case HTTP_EVENT_ON_HEADER:
+        break;
+    case HTTP_EVENT_ON_DATA:
+        if (!esp_http_client_is_chunked_response(evt->client))
+        {
+            strncpy(rcv_buffer, (char *)evt->data, evt->data_len);
+        }
+        break;
+    case HTTP_EVENT_ON_FINISH:
+        break;
+    case HTTP_EVENT_DISCONNECTED:
+        break;
+    }
+    return ESP_OK;
+}
+
 void System::init(PersistentData *persistentData)
 {
     espid = persistentData->espid;
@@ -23,7 +54,7 @@ void System::init(PersistentData *persistentData)
 
 void System::setup_wifi(PersistentData *persistentData)
 {
-    uint8_t selectedNetwork = 1;    // manual override
+    uint8_t selectedNetwork = 0;    // manual override
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.println();
@@ -62,10 +93,10 @@ void System::setup_wifi(PersistentData *persistentData)
             Serial.println("WiFi connected");
             Serial.println("IP address: ");
             Serial.println(WiFi.localIP());
+            Serial.println(WiFi.macAddress());
             mqttClient.setServer(persistentData->networks[selectedNetwork].mqtt, 1883);
             break;
         }
-
     }
 }
 
@@ -99,6 +130,65 @@ void System::reconnect()
             delay(5000);
         }
     }
+}
+
+char *System::checkForUpdate(const char *cert)
+{
+    //UPDATE_JSON_URL
+    char *downloadUrl = '\0';
+    printf("Looking for a new firmware...\n");
+
+    // configure the esp_http_client
+    esp_http_client_config_t config = {};
+    config.url = UPDATE_JSON_URL;
+    config.event_handler = _http_event_handler;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    // downloading the json file
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK)
+    {
+        // parse the json file
+        cJSON *json = cJSON_Parse(rcv_buffer);
+        if (json == NULL)
+            printf("downloaded file is not a valid json, aborting...\n");
+        else
+        {
+            cJSON *version = cJSON_GetObjectItemCaseSensitive(json, "version");
+            cJSON *file = cJSON_GetObjectItemCaseSensitive(json, "file");
+
+            // check the version
+            if (!cJSON_IsNumber(version))
+                printf("unable to read new version, aborting...\n");
+            else
+            {
+                double new_version = version->valuedouble;
+                if (new_version > FIRMWARE_VERSION)
+                {
+                    printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...\n", FIRMWARE_VERSION, new_version);
+                    if (cJSON_IsString(file) && (file->valuestring != NULL))
+                    {
+                        //System::do_firmware_upgrade(file->valuestring, cert);
+                        downloadUrl = file->valuestring;
+                    }
+                    else
+                        printf("unable to read the new file name, aborting...\n");
+                }
+                else
+                    printf("current firmware version (%.1f) is greater or equal to the available one (%.1f), nothing to do...\n", FIRMWARE_VERSION, new_version);
+            }
+        }
+    }
+    else
+        printf("unable to download the json file, aborting...\n");
+
+    // cleanup
+    esp_http_client_cleanup(client);
+
+    printf("\n");
+    //vTaskDelay(30000 / portTICK_PERIOD_MS);
+    return downloadUrl;
 }
 
 esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
