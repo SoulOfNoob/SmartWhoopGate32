@@ -16,7 +16,11 @@
   - RESET
     - `MAXRSSI RESET`
   - SET
-    - `MAXRSSI SET [1] = <2500>`
+    - `MAXRSSI SET [1] <2500>`
+- EEPROM
+  - SET
+    - NAME
+      - `EEPROM SET NAME <Gate10>`
 - UPDATE
   - `UPDATE`
 - RESTART
