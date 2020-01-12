@@ -5,7 +5,7 @@
 #include <PubSubClient.h>
 
 #define UPDATE_JSON_URL "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.json"
-#define FIRMWARE_VERSION 0.7
+#define FIRMWARE_VERSION 0.8
 
 struct NetworkData
 {
@@ -34,6 +34,8 @@ public:
     static PubSubClient mqttClient;
 
     static String espid;
+    static String fallbackId;
+    static String fallbackTopic;
     static String cmdTopic;
     static String statusTopic;
 

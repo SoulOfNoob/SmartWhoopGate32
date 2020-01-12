@@ -36,6 +36,7 @@ void saveEEPROM(PersistentData argument);
 PersistentData loadEEPROM();
 void printMaxRssi();
 void printEEPROM(PersistentData persistentData);
+void initCustomEEPROM();
 
 // Functions
 void setup()
@@ -50,7 +51,10 @@ void setup()
     }
     Serial.print("setup() running on core ");
     Serial.println(xPortGetCoreID());
-    Serial.println("Firmware Version: 0.5");
+    Serial.print("Firmware Version: ");
+    Serial.println(FIRMWARE_VERSION);
+
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 
     persistentData = loadEEPROM();
 
@@ -59,7 +63,6 @@ void setup()
     System::setup_wifi(&persistentData);
 
     System::mqttClient.setCallback(evaluateMQTTMessage);
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     RX5808::init();
 
     //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
@@ -190,6 +193,36 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
         }
         printMaxRssi();
     }
+    else if (messageTemp.indexOf("EEPROM") >= 0)
+    {
+        if (messageTemp.indexOf("SET") >= 0)
+        {
+            if (messageTemp.indexOf("NAME") >= 0)
+            {
+                int nameStart = messageTemp.indexOf("<");
+                int nameSop = messageTemp.indexOf(">");
+                if (nameStart > 0 && nameSop > 0) 
+                {
+                    String name = messageTemp.substring(nameStart + 1, nameSop);
+                    if (name.length() > 0)
+                    {
+                        persistentData.espid = name;
+                        saveEEPROM(persistentData);
+                        System::mqttClient.publish(System::statusTopic.c_str(), "Set");
+                        esp_restart();
+                    }
+                    else
+                    {
+                        System::mqttClient.publish(System::statusTopic.c_str(), "Invalid value");
+                    }
+                }
+                else
+                {
+                    System::mqttClient.publish(System::statusTopic.c_str(), "Invalid format");
+                }
+            }
+        }
+    }
     else if (messageTemp.indexOf("UPDATE") >= 0)
     {
         checkUpdate();
@@ -210,6 +243,7 @@ void Task1code(void *pvParameters)
     {
         if(mode == 1)
         {
+            checkUpdate();
             Animations::startup(leds);
             mode = 2;
         }
@@ -267,14 +301,11 @@ void loop()
 void checkUpdate()
 {
     char *url = System::checkForUpdate(digicert_pem_start);
-    Serial.print("url: ");
-    Serial.println(url);
     if (strlen(url) != 0)
     {
         mode = 9;
         Animations::off(leds);
         Animations::update(leds);
-        //const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
         System::do_firmware_upgrade(url, digicert_pem_start);
     }
     else
@@ -304,9 +335,11 @@ PersistentData loadEEPROM()
     EEPROM.get(0, eData);
     EEPROM.get(0 + sizeof(eData), ok);
     EEPROM.end();
+    Serial.println(eData.espid);
     if (String(ok) != String("OK"))
     {
-        eData = {};
+        Serial.println("No OK!");
+        initCustomEEPROM();
     }
     return eData;
 }
@@ -351,4 +384,20 @@ void printEEPROM(PersistentData eData)
     Serial.println(eData.networks[2].pass);
     Serial.print("mqtt3: ");
     Serial.println(eData.networks[2].mqtt);
+}
+
+// remove for commit
+void initCustomEEPROM()
+{
+    Animations::circle(leds, CRGB::Blue);
+    // Put your WiFi Settings here:
+    PersistentData writeData = {
+        "NONAME", // MQTT Topic
+        {
+            {"SSID", "PASS", "MQTT"}, // WiFi 1
+            {"SSID", "PASS", "MQTT"}, // WiFi 2
+            {"SSID", "PASS", "MQTT"}  // WiFi 3
+        }};
+    saveEEPROM(writeData);
+    esp_restart();
 }

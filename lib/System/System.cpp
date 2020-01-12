@@ -12,6 +12,8 @@ WiFiClient System::wifiClient;
 PubSubClient System::mqttClient(System::wifiClient);
 
 String System::espid;
+String System::fallbackId;
+String System::fallbackTopic;
 String System::cmdTopic;
 String System::statusTopic;
 
@@ -47,9 +49,7 @@ esp_err_t System::_http_event_handler(esp_http_client_event_t *evt)
 
 void System::init(PersistentData *persistentData)
 {
-    espid = persistentData->espid;
-    cmdTopic = "Gates/" + espid + "/cmd";
-    statusTopic = "Gates/" + espid + "/status";
+    
 }
 
 void System::setup_wifi(PersistentData *persistentData)
@@ -93,7 +93,24 @@ void System::setup_wifi(PersistentData *persistentData)
             Serial.println("WiFi connected");
             Serial.println("IP address: ");
             Serial.println(WiFi.localIP());
+            Serial.println("MAC address: ");
             Serial.println(WiFi.macAddress());
+            fallbackId = WiFi.macAddress();
+            fallbackId.replace(":", "");
+
+            if (persistentData->espid.indexOf("NONAME") >= 0)
+            {
+                persistentData->espid = fallbackId;
+                Serial.print("fallback Name: ");
+                Serial.println(persistentData->espid);
+            }
+
+            espid = persistentData->espid;
+            cmdTopic = "Gates/" + espid + "/cmd";
+            statusTopic = "Gates/" + espid + "/status";
+
+            fallbackTopic = "Gates/" + fallbackId + "/cmd";
+
             mqttClient.setServer(persistentData->networks[selectedNetwork].mqtt, 1883);
             break;
         }
@@ -114,6 +131,9 @@ void System::reconnect()
             // Subscribe
             mqttClient.subscribe("Gates/cmd");
             Serial.println("subscribed to: Gates/cmd");
+            mqttClient.subscribe(System::fallbackTopic.c_str());
+            Serial.print("subscribed to: ");
+            Serial.println(System::fallbackTopic);
             mqttClient.subscribe(System::cmdTopic.c_str());
             Serial.print("subscribed to: ");
             Serial.println(System::cmdTopic);
@@ -135,7 +155,7 @@ void System::reconnect()
 char *System::checkForUpdate(const char *cert)
 {
     //UPDATE_JSON_URL
-    char *downloadUrl = '\0';
+    char *downloadUrl = "";
     printf("Looking for a new firmware...\n");
 
     // configure the esp_http_client
