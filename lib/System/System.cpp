@@ -19,34 +19,54 @@ void System::init(PersistentData *persistentData)
     espid = persistentData->espid;
     cmdTopic = "Gates/" + espid + "/cmd";
     statusTopic = "Gates/" + espid + "/status";
-    mqttClient.setServer(persistentData->networks[1].mqtt, 1883);
 }
 
 void System::setup_wifi(PersistentData *persistentData)
 {
-    // We start by connecting to a WiFi network
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(persistentData->networks[1].ssid);
-    Serial.print("with password ");
-    Serial.println(persistentData->networks[1].pass);
-
-    WiFi.begin(persistentData->networks[1].ssid, persistentData->networks[1].pass);
-    //WiFi.begin(char *ssid, char *pass);
-
-    int counter = 0;
+    uint8_t selectedNetwork = 0;
     while (WiFi.status() != WL_CONNECTED)
     {
-        if (counter > 20) esp_restart();
-        delay(500);
-        Serial.print(".");
-        counter++;
-    }
+        Serial.println();
+        Serial.print("Connecting to ");
+        Serial.println(persistentData->networks[selectedNetwork].ssid);
 
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+        WiFi.begin(persistentData->networks[selectedNetwork].ssid, persistentData->networks[selectedNetwork].pass);
+
+        int counter = 0;
+        while (WiFi.status() != WL_CONNECTED)
+        {
+            //if (counter > 10) esp_restart(); // if it doesn't connect in 5 seconds it never will so restart
+            if (counter > 10) break;
+            delay(500);
+            Serial.print(".");
+            counter++;
+        }
+
+        if(WiFi.status() != WL_CONNECTED)
+        {
+            Serial.println("");
+            Serial.println("Unable to connect trying next Network");
+            if(selectedNetwork < 2)
+            {
+                selectedNetwork++;
+            }
+            else
+            {
+                Serial.println("All Connections failed, restarting.");
+                esp_restart();
+            }
+        }
+        else
+        {
+            Serial.println("");
+            Serial.println("WiFi connected");
+            Serial.println("IP address: ");
+            Serial.println(WiFi.localIP());
+            mqttClient.setServer(persistentData->networks[selectedNetwork].mqtt, 1883);
+            break;
+        }
+
+    }
 }
 
 void System::reconnect()
