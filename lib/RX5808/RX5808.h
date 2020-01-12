@@ -7,9 +7,10 @@ public:
     static void init();
     static void checkRssi();
     static void checkDroneNear();
-    static void setDroneColor(int num_leds, CRGB* leds);
+    static int getNearestDrone();
+    static void setDroneColor(CRGB *leds);
 
-    static byte brightness;
+    static byte defaultBrightness;
 
 private:
     static void setupSPIpins();
@@ -28,4 +29,5 @@ private:
     static int maxRssi[8];
     static int maxRssiTime[8];
     static int ledTime;
+    static bool offset;
 };

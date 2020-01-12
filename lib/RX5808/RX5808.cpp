@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <RX5808.h>
+#include <Animations.h>
 #include <FastLED.h>
 
 #define spiDataPin 16
@@ -18,7 +19,7 @@ int RX5808::maxRssi[8];
 int RX5808::maxRssiTime[8];
 int RX5808::ledTime;
 
-byte RX5808::brightness;
+bool RX5808::offset = false;
 
 const uint16_t channelFreqTable[] PROGMEM = {
     5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917, // Raceband
@@ -34,7 +35,7 @@ const uint16_t channelFreqTable[] PROGMEM = {
 void RX5808::init()
 {
     frequency = 0;
-    debug = false;
+    debug = true;
     ledTime = 0;
 
     Serial.print("RX5808 Init()");
@@ -281,8 +282,25 @@ void RX5808::checkDroneNear()
         }
     }
 }
-
-void RX5808::setDroneColor(int num_leds, CRGB *leds)
+int RX5808::getNearestDrone() 
+{
+    int nearest = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        if (droneNear[i] & (droneNearTime[i] > nearest))
+        {
+            if (debug)
+            {
+                Serial.print("Channel: ");
+                Serial.print(i);
+                Serial.println(" Dronenear! ");
+            }
+            nearest = droneNearTime[i];
+        }
+    }
+    return nearest;
+}
+void RX5808::setDroneColor(CRGB *leds)
 {
     int newest = 0;
     for (int i = 0; i < 8; i++)
@@ -296,79 +314,11 @@ void RX5808::setDroneColor(int num_leds, CRGB *leds)
                 Serial.println(" Dronenear! ");
             }
             newest = droneNearTime[i];
-            for (int x = 0; x < num_leds; x++)
-            {
-                if (i == 0)
-                {
-                    leds[x] = CRGB::Green;
-                }
-                else if (i == 1)
-                {
-                    leds[x] = CRGB::Red;
-                }
-                else if (i == 2)
-                {
-                    leds[x] = CRGB::Blue;
-                }
-                else if (i == 3)
-                {
-                    leds[x] = CRGB::Yellow;
-                }
-                else if (i == 4)
-                {
-                    leds[x] = CRGB::Pink;
-                }
-                else if (i == 5)
-                {
-                    leds[x] = CRGB::Purple;
-                }
-                else if (i == 6)
-                {
-                    leds[x] = CRGB::YellowGreen;
-                }
-                else if (i == 7)
-                {
-                    leds[x] = CRGB::Magenta;
-                }
-            }
+            Animations::setChannelColor(leds, i);
         }
     }
     if (newest == 0)
     {
-        if (ledTime + 500 < millis())
-        {
-            for (int x = 0; x < num_leds; x++)
-            {
-                if (x % 2 == 0)
-                {
-                    leds[x] = CRGB::White;
-                    brightness = 200;
-                }
-                else
-                {
-                    leds[x] = CRGB::Black;
-                }
-            }
-            ledTime = millis();
-        }
-        else
-        {
-            for (int x = 0; x < num_leds; x++)
-            {
-                if (x % 2 == 1)
-                {
-                    leds[x] = CRGB::White;
-                    brightness = 200;
-                }
-                else
-                {
-                    leds[x] = CRGB::Black;
-                }
-            }
-        }
-    }
-    else
-    {
-        brightness = 255;
+        Animations::standby(leds);
     }
 }

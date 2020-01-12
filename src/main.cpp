@@ -5,12 +5,12 @@
 #include <ArduinoOTA.h>
 #include <FastLED.h>
 #include <RX5808.h>
+#include <Animations.h>
 #include <System.h>
 
 // Macros
-#define NUM_LEDS 90
 #define DATA_PIN 13
-#define CONFIG_FIRMWARE_UPGRADE_URL "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.bin"
+#define NUM_LEDS 90
 
 // Constants
 extern const char github_pem_start[] asm("_binary_certs_github_pem_start");
@@ -21,7 +21,6 @@ TaskHandle_t Task1;
 TaskHandle_t Task2;
 CRGB leds[NUM_LEDS];
 
-bool ledOn = false;
 uint8_t mode = 0;
 
 // Declarations
@@ -42,11 +41,12 @@ void setup()
     }
     Serial.print("setup() running on core ");
     Serial.println(xPortGetCoreID());
-    Serial.println("Firmware Version: 0.3");
+    Serial.println("Firmware Version: 0.4");
 
     // init librarys
+    System::init(WIFI_SSID, WIFI_PASS, MQTT_BROKER);
     System::setup_wifi();
-    System::init();
+    
     System::mqttClient.setCallback(evaluateMQTTMessage);
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     RX5808::init();
@@ -64,6 +64,8 @@ void setup()
 
     ArduinoOTA
         .onStart([]() {
+            //mode = 9;
+            //Animations::update(leds);
             String type;
             if (ArduinoOTA.getCommand() == U_FLASH)
                 type = "sketch";
@@ -115,18 +117,19 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     if (messageTemp.indexOf("ON") >= 0)
     {
         Serial.println("Turning LEDs ON");
-        ledOn = true;
+        mode = 3;
         System::mqttClient.publish("jryesp32/output", "LEDs ON");
     }
     else if (messageTemp.indexOf("OFF") >= 0)
     {
         Serial.println("Turning LEDs OFF");
-        ledOn = false;
+        mode = 2;
         System::mqttClient.publish("jryesp32/output", "LEDs OFF");
     }
     else if (messageTemp.indexOf("UPDATE") >= 0)
     {
-        Serial.println("Trying Update");
+        mode = 2;
+        Animations::update(leds);
         const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
         System::do_firmware_upgrade(url, digicert_pem_start);
     }
@@ -140,15 +143,28 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {
-        if(ledOn){
-            RX5808::checkRssi();
-            RX5808::checkDroneNear();
-            RX5808::setDroneColor(NUM_LEDS, leds);
-            FastLED.setBrightness(RX5808::brightness);
-            FastLED.show();
-        }else{
-            FastLED.setBrightness(0);
-            FastLED.show();
+        switch (mode)
+        {
+            case 1:
+                Animations::startup(leds);
+                mode = 2;
+                break;
+
+            case 2:
+                mode = 9;
+                Animations::off(leds);
+                break;
+
+            case 3:
+                RX5808::checkRssi();
+                RX5808::checkDroneNear();
+                Animations::setChannelColor(leds, RX5808::getNearestDrone());
+                RX5808::setDroneColor(leds);
+                break;
+
+            default:
+                delay(10);
+                break;
         }
     }
 }
@@ -166,13 +182,15 @@ void loop()
     //     Serial.print("loop() running on core ");
     //     Serial.println(xPortGetCoreID());
     // }
-    EVERY_N_SECONDS(30)
+    EVERY_N_MINUTES(5)
     {
         Serial.println("sending mqtt");
         System::mqttClient.publish("jryesp32/output", "still alive");
     }
     EVERY_N_HOURS(24)
     {
+        //mode = 9;
+        //Animations::update(leds);
         const char *url = CONFIG_FIRMWARE_UPGRADE_URL;
         System::do_firmware_upgrade(url, digicert_pem_start);
     }
