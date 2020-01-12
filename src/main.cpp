@@ -25,17 +25,18 @@ CRGB leds[NUM_LEDS];
 
 uint8_t mode = 0;
 
-String espid, ssid, password, mqtt_server;
+PersistentData persistentData;
 
 // Declarations
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
 void evaluateMQTTMessage(char *topic, byte *message, unsigned int length);
-void loadEEPROM(); 
-void saveEEPROM(String espid, String ssid, String password, String mqtt_server);
+void saveEEPROM(PersistentData argument);
+PersistentData loadEEPROM();
+void printEEPROM(PersistentData persistentData);
 
-    // Functions
-    void setup()
+// Functions
+void setup()
 {
     Serial.begin(115200);
     Serial.println("\n\n\n");
@@ -49,12 +50,12 @@ void saveEEPROM(String espid, String ssid, String password, String mqtt_server);
     Serial.println(xPortGetCoreID());
     Serial.println("Firmware Version: 0.4");
 
-    //loadEEPROM();
+    persistentData = loadEEPROM();
 
     // init librarys
-    System::init(WIFI_SSID, WIFI_PASS, MQTT_BROKER);
-    System::setup_wifi();
-    
+    System::init(&persistentData);
+    System::setup_wifi(&persistentData);
+
     System::mqttClient.setCallback(evaluateMQTTMessage);
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     RX5808::init();
@@ -126,13 +127,13 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     {
         Serial.println("Turning LEDs ON");
         mode = 3;
-        System::mqttClient.publish("smartwhoopgates32/output", "LEDs ON");
+        System::mqttClient.publish(System::statusTopic.c_str(), "LEDs ON");
     }
     else if (messageTemp.indexOf("OFF") >= 0)
     {
         Serial.println("Turning LEDs OFF");
         mode = 2;
-        System::mqttClient.publish("smartwhoopgates32/output", "LEDs OFF");
+        System::mqttClient.publish(System::statusTopic.c_str(), "LEDs OFF");
     }
     else if (messageTemp.indexOf("UPDATE") >= 0)
     {
@@ -212,43 +213,58 @@ void loop()
     ArduinoOTA.handle();
 }
 
-void loadEEPROM()
+void saveEEPROM(PersistentData eData)
 {
+    Serial.print("Writing ");
+    Serial.print(sizeof(eData));
+    Serial.println(" Bytes to EEPROM.");
+    char ok[2 + 1] = "OK";
+    EEPROM.begin(EEPROM_SIZE);
+    EEPROM.put(0, eData);
+    EEPROM.put(0 + sizeof(eData), ok);
+    EEPROM.commit();
+    EEPROM.end();
+}
+
+PersistentData loadEEPROM()
+{
+    PersistentData eData;
     char ok[2 + 1];
     EEPROM.begin(EEPROM_SIZE);
-    EEPROM.get(0, espid);
-    EEPROM.get(0 + sizeof(espid), ssid);
-    EEPROM.get(0 + sizeof(espid) + sizeof(ssid), password);
-    EEPROM.get(0 + sizeof(espid) + sizeof(ssid) + sizeof(password), mqtt_server);
-    EEPROM.get(0 + sizeof(espid) + sizeof(ssid) + sizeof(password) + sizeof(mqtt_server), ok);
+    EEPROM.get(0, eData);
+    EEPROM.get(0 + sizeof(eData), ok);
     EEPROM.end();
     if (String(ok) != String("OK"))
     {
-        espid[0] = 0;
-        ssid[0] = 0;
-        password[0] = 0;
-        mqtt_server[0] = 0;
+        eData = {};
     }
-    Serial.println("Recovered credentials: espid: ");
-    Serial.print("espid: ");
-    Serial.println(espid);
-    Serial.print("espid: ");
-    Serial.println(ssid);
-    Serial.print("password: ");
-    Serial.println(password);
-    Serial.print("mqtt_server: ");
-    Serial.println(mqtt_server);
+    return eData;
 }
 
-void saveEEPROM(String espid, String ssid, String password, String mqtt_server)
+void printEEPROM(PersistentData eData)
 {
-    char ok[2 + 1] = "OK";
-    EEPROM.begin(EEPROM_SIZE);
-    EEPROM.put(0, espid);
-    EEPROM.put(0 + sizeof(espid), ssid);
-    EEPROM.put(0 + sizeof(espid) + sizeof(ssid), password);
-    EEPROM.put(0 + sizeof(espid) + sizeof(ssid) + sizeof(password), mqtt_server);
-    EEPROM.put(0 + sizeof(espid) + sizeof(ssid) + sizeof(password) + sizeof(mqtt_server), ok);
-    EEPROM.commit();
-    EEPROM.end();
+    Serial.println("EEPROM Data:");
+    Serial.print("espid: ");
+    Serial.println(eData.espid);
+
+    Serial.print("ssid1: ");
+    Serial.println(eData.networks[0].ssid);
+    Serial.print("pass1: ");
+    Serial.println(eData.networks[0].pass);
+    Serial.print("mqtt1: ");
+    Serial.println(eData.networks[0].mqtt);
+
+    Serial.print("ssid2: ");
+    Serial.println(eData.networks[1].ssid);
+    Serial.print("pass2: ");
+    Serial.println(eData.networks[1].pass);
+    Serial.print("mqtt2: ");
+    Serial.println(eData.networks[1].mqtt);
+
+    Serial.print("ssid3: ");
+    Serial.println(eData.networks[2].ssid);
+    Serial.print("pass3: ");
+    Serial.println(eData.networks[2].pass);
+    Serial.print("mqtt3: ");
+    Serial.println(eData.networks[2].mqtt);
 }

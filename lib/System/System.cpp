@@ -5,37 +5,42 @@
 #include <esp_https_ota.h>
 #include <PubSubClient.h>
 
-const char *System::_ssid;
-const char *System::_password;
-const char *System::_mqtt_server_ip;
+PersistentData *System::_persistentData;
 
 WiFiClient System::wifiClient;
 PubSubClient System::mqttClient(System::wifiClient);
 
-void System::init(const char *ssid, const char *password, const char *mqtt_server_ip)
+String System::espid;
+String System::cmdTopic;
+String System::statusTopic;
+
+void System::init(PersistentData *persistentData)
 {
-    _ssid = ssid;
-    _password = password;
-    _mqtt_server_ip = mqtt_server_ip;
-    mqttClient.setServer(_mqtt_server_ip, 1883);
+    espid = persistentData->espid;
+    cmdTopic = "Gates/" + espid + "/cmd";
+    statusTopic = "Gates/" + espid + "/status";
+    mqttClient.setServer(persistentData->networks[1].mqtt, 1883);
 }
 
-void System::setup_wifi()
+void System::setup_wifi(PersistentData *persistentData)
 {
     // We start by connecting to a WiFi network
     Serial.println();
     Serial.print("Connecting to ");
-    Serial.println(_ssid);
+    Serial.println(persistentData->networks[1].ssid);
     Serial.print("with password ");
-    Serial.println(_password);
+    Serial.println(persistentData->networks[1].pass);
 
-    WiFi.begin(_ssid, _password);
+    WiFi.begin(persistentData->networks[1].ssid, persistentData->networks[1].pass);
     //WiFi.begin(char *ssid, char *pass);
 
+    int counter = 0;
     while (WiFi.status() != WL_CONNECTED)
     {
+        if (counter > 20) esp_restart();
         delay(500);
         Serial.print(".");
+        counter++;
     }
 
     Serial.println("");
@@ -47,18 +52,23 @@ void System::setup_wifi()
 void System::reconnect()
 {
     // Loop until we're reconnected
-    while (!System::mqttClient.connected())
+    while (!mqttClient.connected())
     {
         Serial.print("Attempting MQTT connection...");
         // Attempt to connect
-        if (mqttClient.connect("jryesp32Client"))
+        String clientName = espid + "_Client";
+        if (mqttClient.connect(clientName.c_str()))
         {
             Serial.println("connected");
             // Subscribe
-            mqttClient.subscribe("jryesp32/cmd");
-            Serial.println("subscribed");
-            mqttClient.publish("jryesp32/output", "Ready to Receive");
-            Serial.println("published");
+            mqttClient.subscribe("Gates");
+            Serial.println("subscribed to: Gates");
+            mqttClient.subscribe(System::cmdTopic.c_str());
+            Serial.print("subscribed to: ");
+            Serial.println(System::cmdTopic);
+            mqttClient.publish(System::statusTopic.c_str(), "Ready to Receive");
+            Serial.print("published to: ");
+            Serial.println(System::statusTopic);
         }
         else
         {
