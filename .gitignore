@@ -2,3 +2,4 @@
 .vscode
 include/config.h
 helpers/SetGateEEPROM/SetGateEEPROM.ino
+helpers/notes.txt

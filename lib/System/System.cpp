@@ -110,6 +110,11 @@ void System::setup_wifi(PersistentData *persistentData)
             statusTopic = "Gates/" + espid + "/status";
 
             fallbackTopic = "Gates/" + fallbackId + "/cmd";
+            // ToDo: MAKE BETTER
+            char hostname_c[64];
+            String hostname_s = "Drone_" + espid;
+            hostname_s.toCharArray(hostname_c, 64);
+            WiFi.setHostname(hostname_c);
 
             mqttClient.setServer(persistentData->networks[selectedNetwork].mqtt, 1883);
             break;

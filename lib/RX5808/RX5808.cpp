@@ -13,7 +13,7 @@
 uint16_t RX5808::frequency;
 int RX5808::rssi[8];
 bool RX5808::droneNear[8];
-int RX5808::droneNearTime[8];
+int RX5808::RX5808::droneNearTime[8];
 bool RX5808::debug;
 int RX5808::maxRssi[8];
 int RX5808::maxRssiTime[8];
@@ -36,7 +36,7 @@ const uint16_t channelFreqTable[] PROGMEM = {
 void RX5808::init()
 {
     frequency = 0;
-    debug = true;
+    debug = false;
     ledTime = 0;
 
     Serial.print("RX5808 Init()");
@@ -237,6 +237,7 @@ void RX5808::setModuleFrequency(uint16_t frequency)
 void RX5808::resetMaxRssi(uint8_t channel){
     maxRssiTime[channel] = millis();
     maxRssi[channel] = 3000;
+    RX5808::droneNearTime[channel] = 0;
 }
 
 void RX5808::checkRssi()
@@ -251,7 +252,27 @@ void RX5808::checkRssi()
             maxRssi[i] = rssi[i];
         }
         if(autoReset){
-            RX5808::resetMaxRssi(i);
+            EVERY_N_SECONDS(10){
+                for(uint8_t i = 0; i < 8; i++)
+                {
+                    if (RX5808::droneNearTime[i] != 0)
+                    {
+                        Serial.print("Calc Reset: ");
+                        Serial.print(RX5808::droneNearTime[i] + 180000);
+                        Serial.print(" < ");
+                        Serial.print(millis());
+                        Serial.print(" = ");
+                        Serial.println(RX5808::droneNearTime[i] + 180000 < millis());
+                        if (RX5808::droneNearTime[i] + 180000 < millis()) // 3 min
+                        {
+                            Serial.print("Reset: ");
+                            Serial.print(i);
+                            RX5808::resetMaxRssi(i);
+                        }
+                    }
+                    
+                }
+            }
         }
         if ((rssi[i] >= 2000 && debug))
         {
@@ -270,28 +291,30 @@ void RX5808::checkDroneNear()
         if (rssi[i] > (maxRssi[i] - 80))
         {
             droneNear[i] = true;
-            droneNearTime[i] = millis();
+            RX5808::droneNearTime[i] = millis();
             if (debug)
             {
                 Serial.print("Channel: ");
                 Serial.print(i);
                 Serial.print(" Time: ");
-                Serial.println(droneNearTime[i]);
+                Serial.println(RX5808::droneNearTime[i]);
             }
         }
-        else if (droneNearTime[i] < millis() - 5000)
+        else if (RX5808::droneNearTime[i] < millis() - 5000)
         {
             droneNear[i] = false;
-            droneNearTime[i] = 0;
+            //RX5808::droneNearTime[i] = 0;
         }
     }
 }
-int RX5808::getNearestDrone() 
+
+int RX5808::getNearestDrone()
 {
-    int nearest = 0;
+    int newest = 0;
+    int nearestChannel = 0;
     for (int i = 0; i < 8; i++)
     {
-        if (droneNear[i] & (droneNearTime[i] > nearest))
+        if (droneNear[i] & (RX5808::droneNearTime[i] > newest))
         {
             if (debug)
             {
@@ -299,17 +322,18 @@ int RX5808::getNearestDrone()
                 Serial.print(i);
                 Serial.println(" Dronenear! ");
             }
-            nearest = droneNearTime[i];
+            newest = RX5808::droneNearTime[i];
+            nearestChannel = i;
         }
     }
-    return nearest;
+    return nearestChannel;
 }
 void RX5808::setDroneColor(CRGB *leds)
 {
     int newest = 0;
     for (int i = 0; i < 8; i++)
     {
-        if (RX5808::droneNear[i] & (RX5808::droneNearTime[i] > newest))
+        if (droneNear[i] & (RX5808::droneNearTime[i] > newest))
         {
             if (debug)
             {
@@ -317,7 +341,7 @@ void RX5808::setDroneColor(CRGB *leds)
                 Serial.print(i);
                 Serial.println(" Dronenear! ");
             }
-            newest = droneNearTime[i];
+            newest = RX5808::droneNearTime[i];
             Animations::setChannelColor(leds, i);
         }
     }

@@ -348,6 +348,18 @@ void loop()
     if (mode == 3)
     {
         int nearest = RX5808::getNearestDrone();
+        EVERY_N_SECONDS(1)
+        {
+            if(nearest != 0)
+            {
+                Serial.print("Current Nearest: ");
+                Serial.println(nearest);
+            }
+        }
+        EVERY_N_SECONDS(1)
+        {
+            printMaxRssi();
+        }
         if (nearest != 0)
         {
             Animations::setChannelColor(leds, nearest);
@@ -458,7 +470,7 @@ void printMaxRssi()
     String values = "Values: ";
     for( int i = 0 ; i < 8 ; i++ )
     {
-        values += i;
+        values += i+1;
         values += ": ";
         values += maxRssi[i];
         values += ", ";
