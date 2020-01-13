@@ -157,6 +157,8 @@ void System::reconnect()
     }
 }
 
+
+// ToDo: return version number and save url globally
 char *System::checkForUpdate(const char *cert)
 {
     //UPDATE_JSON_URL

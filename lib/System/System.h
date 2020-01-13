@@ -11,7 +11,7 @@
     and after setting up wifi and mqtt server,
     current firmware will be loaded without resetting EEPROM.
 */
-#define FIRMWARE_VERSION 1.4
+#define FIRMWARE_VERSION 1.0
 
 struct NetworkData
 {
@@ -20,6 +20,7 @@ struct NetworkData
     char mqtt[32];
 };
 
+// ToDo: char espid[16]
 struct PersistentData
 {
     String espid;

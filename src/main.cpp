@@ -304,6 +304,7 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
     {
         esp_restart();
     }
+    // ToDo: make AutoUpdate optional
 }
 
 //Task1code: blinks an LED every 1000 ms
@@ -330,6 +331,7 @@ void Task1code(void *pvParameters)
         // SleepMode?
         else
         {
+            // ToDo: Terminate tast when idle?
             delay(200);
         }
     }
@@ -405,21 +407,30 @@ void loop()
         Animations::bpm(leds);
     }
 
-    EVERY_N_MINUTES(5)
+    // Debug StartupAnimation
+    else if (mode == 95)
     {
-        Serial.println("sending mqtt");
-        System::mqttClient.publish(System::statusTopic.c_str(), "still alive"); // + version
+        Animations::startup(leds);
+    }
+    // Debug UpdateAnimation
+    else if (mode == 96)
+    {
+        Animations::update(leds);
+    }
+    // Debug EepromAnimation
+    else if (mode == 97)
+    {
+        Animations::initEEPROM(leds);
+    }
+    // Debug StandbyAnimation
+    else if (mode == 98)
+    {
+        Animations::standby(leds);
     }
 
     EVERY_N_MINUTES(10)
     {
-        String message;
-        message += "Version :'";
-        message += FIRMWARE_VERSION;
-        message += "' Checking for Updates..";
-        System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
         checkUpdate();
-        
     }
 
     ArduinoOTA.handle();
@@ -427,11 +438,18 @@ void loop()
 
 void checkUpdate()
 {
+    String message;
+    message += "Online Since: ";
+    message += millis();
+    message += "Millis, Current version :'";
+    message += FIRMWARE_VERSION;
+    message += "' Checking for updates..";
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
     {
         //update available
-        System::mqttClient.publish(System::statusTopic.c_str(), "Update Found.");
+        message += " update found.";
+        System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
         mode = 99;
         Animations::update(leds);
         System::do_firmware_upgrade(url, digicert_pem_start);
@@ -439,11 +457,27 @@ void checkUpdate()
     else
     {
         // no update
-        System::mqttClient.publish(System::statusTopic.c_str(), "No update Found.");
+        message += " no update found.";
+        System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
         Serial.println("No File");
     }
 }
 
+void printMaxRssi()
+{
+    int *maxRssi = RX5808::maxRssi;
+    String values = "Values: ";
+    for (int i = 0; i < 8; i++)
+    {
+        values += i + 1;
+        values += ": ";
+        values += maxRssi[i];
+        values += ", ";
+    }
+    System::mqttClient.publish(System::statusTopic.c_str(), values.c_str());
+}
+
+// ToDo: EEPROM stuff in system.cpp
 void saveEEPROM(PersistentData eData)
 {
     Serial.print("Writing ");
@@ -472,20 +506,6 @@ PersistentData loadEEPROM()
         initCustomEEPROM();
     }
     return eData;
-}
-
-void printMaxRssi()
-{
-    int *maxRssi = RX5808::maxRssi;
-    String values = "Values: ";
-    for( int i = 0 ; i < 8 ; i++ )
-    {
-        values += i+1;
-        values += ": ";
-        values += maxRssi[i];
-        values += ", ";
-    }
-    System::mqttClient.publish(System::statusTopic.c_str(), values.c_str());
 }
 
 void printEEPROM(PersistentData eData)
@@ -517,6 +537,7 @@ void printEEPROM(PersistentData eData)
 }
 
 // Default config
+// put in extra file
 void initCustomEEPROM()
 {
     Animations::circle(leds, CRGB::Blue);
