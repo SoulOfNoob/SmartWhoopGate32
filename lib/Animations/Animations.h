@@ -17,6 +17,7 @@ public:
     static void circle(CRGB *leds, CRGB color);
     static void party(CRGB *leds);
     static void pulseCircleRGB(CRGB *leds);
+    static void wingRotationRGB(CRGB * leds);
     static void rainbow(CRGB *leds);
     static void rainbowWithGlitter(CRGB *leds);
     static void addGlitter(CRGB *leds, fract8 chanceOfGlitter);
@@ -26,6 +27,7 @@ public:
     static void juggle(CRGB *leds);
 
     static void setChannelColor(CRGB *leds, uint8_t channel);
+    static uint8_t doOverflow(uint8_t value, uint8_t min, uint8_t max);
 
 private:
     static const CRGB standbyColor;

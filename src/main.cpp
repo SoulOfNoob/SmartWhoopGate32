@@ -327,49 +327,15 @@ void Task1code(void *pvParameters)
             RX5808::checkRssi();        // caution: BLOCKING!!
             RX5808::checkDroneNear();   // caution: BLOCKING!!
         }
-        // PartyMode
-        else if (mode == 10)
-        {
-            Animations::party(leds);
-        }
-        // rainbow
-        else if (mode == 11)
-        {
-            Animations::rainbow(leds);
-        }
-        // rainbowWithGlitter
-        else if (mode == 12)
-        {
-            Animations::rainbowWithGlitter(leds);
-        }
-        // confetti
-        else if (mode == 13)
-        {
-            Animations::confetti(leds);
-        }
-        // sinelon
-        else if (mode == 14)
-        {
-            Animations::sinelon(leds);
-        }
-        // juggle
-        else if (mode == 15)
-        {
-            Animations::juggle(leds);
-        }
-        // bpm
-        else if (mode == 16)
-        {
-            Animations::bpm(leds);
-        }
         // SleepMode?
-        else if (mode == 99)
+        else
         {
             delay(200);
         }
     }
 }
 
+// non blocking ONLY!
 void loop()
 {
     if (!System::mqttClient.connected())
@@ -378,6 +344,7 @@ void loop()
     }
     System::mqttClient.loop();
 
+    // WhoopMode
     if (mode == 3)
     {
         int nearest = RX5808::getNearestDrone();
@@ -389,6 +356,41 @@ void loop()
         {
             Animations::standby(leds);
         }
+    }
+    // PartyMode
+    else if (mode == 10)
+    {
+        Animations::party(leds);
+    }
+    // rainbow
+    else if (mode == 11)
+    {
+        Animations::rainbow(leds);
+    }
+    // rainbowWithGlitter
+    else if (mode == 12)
+    {
+        Animations::rainbowWithGlitter(leds);
+    }
+    // confetti
+    else if (mode == 13)
+    {
+        Animations::confetti(leds);
+    }
+    // sinelon
+    else if (mode == 14)
+    {
+        Animations::sinelon(leds);
+    }
+    // juggle
+    else if (mode == 15)
+    {
+        Animations::juggle(leds);
+    }
+    // bpm
+    else if (mode == 16)
+    {
+        Animations::bpm(leds);
     }
 
     EVERY_N_MINUTES(5)
