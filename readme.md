@@ -7,6 +7,10 @@
     - `LED ON`
   - OFF
     - `LED OFF`
+  - PARTY
+    - `LED PARTY`
+  - MODE
+    - `LED MODE <11>`
 - MAXRSSI
   - AUTORESET
     - ON

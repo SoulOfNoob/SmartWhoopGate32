@@ -186,7 +186,7 @@ char *System::checkForUpdate(const char *cert)
                 double new_version = version->valuedouble;
                 if (new_version > FIRMWARE_VERSION)
                 {
-                    printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...\n", FIRMWARE_VERSION, new_version);
+                    printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...", FIRMWARE_VERSION, new_version);
                     if (cJSON_IsString(file) && (file->valuestring != NULL))
                     {
                         //System::do_firmware_upgrade(file->valuestring, cert);

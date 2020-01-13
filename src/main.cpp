@@ -55,7 +55,7 @@ void setup()
     Serial.println(FIRMWARE_VERSION);
 
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-    //initCustomEEPROM();
+    if(FIRMWARE_VERSION == 0.0) initCustomEEPROM();
     persistentData = loadEEPROM();
 
     // init librarys
@@ -78,7 +78,7 @@ void setup()
 
     ArduinoOTA
         .onStart([]() {
-            //mode = 9;
+            //mode = 99;
             //Animations::update(leds);
             String type;
             if (ArduinoOTA.getCommand() == U_FLASH)
@@ -133,14 +133,40 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
         if (messageTemp.indexOf("ON") >= 0)
         {
             Serial.println("Turning LEDs ON");
+            Animations::on();
             mode = 3;
             System::mqttClient.publish(System::statusTopic.c_str(), "LEDs ON");
         }
         else if (messageTemp.indexOf("OFF") >= 0)
         {
             Serial.println("Turning LEDs OFF");
-            mode = 2;
+            Animations::off();
+            mode = 99;
             System::mqttClient.publish(System::statusTopic.c_str(), "LEDs OFF");
+        }
+        else if (messageTemp.indexOf("PARTY") >= 0)
+        {
+            Serial.println("Turning PARTYMODE ON");
+            Animations::on();
+            mode = 10;
+            System::mqttClient.publish(System::statusTopic.c_str(), "PARTYMODE ON");
+        }
+        else if (messageTemp.indexOf("MODE") >= 0)
+        {
+            int valueStart = messageTemp.indexOf("<");
+            int valueEnd = messageTemp.indexOf(">");
+            if (valueStart > 0 && valueEnd > 0)
+            {
+                int value = messageTemp.substring(valueStart + 1, valueEnd).toInt();
+                if (value > 10)
+                {
+                    Serial.print("Changing Mode to: ");
+                    Serial.println(value);
+                    Animations::on();
+                    mode = value;
+                    System::mqttClient.publish(System::statusTopic.c_str(), "Mode Set");
+                }
+            }
         }
     }
     // SETMAXRSSI [1] = <1234>"
@@ -288,57 +314,90 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {
+        // BootMode
         if(mode == 1)
         {
             checkUpdate();
             Animations::startup(leds);
-            mode = 2;
+            mode = 99;
         }
-        else if(mode == 2)
-        {
-            Animations::off(leds);
-            mode = 9;
-        }
+        // WhoopMode
         else if(mode == 3)
         {
-            RX5808::checkRssi();
-            RX5808::checkDroneNear();
-            Animations::setChannelColor(leds, RX5808::getNearestDrone());
-            RX5808::setDroneColor(leds);
+            RX5808::checkRssi();        // caution: BLOCKING!!
+            RX5808::checkDroneNear();   // caution: BLOCKING!!
         }
-        else
+        // PartyMode
+        else if (mode == 10)
         {
-            delay(10);
+            Animations::party(leds);
+        }
+        // rainbow
+        else if (mode == 11)
+        {
+            Animations::rainbow(leds);
+        }
+        // rainbowWithGlitter
+        else if (mode == 12)
+        {
+            Animations::rainbowWithGlitter(leds);
+        }
+        // confetti
+        else if (mode == 13)
+        {
+            Animations::confetti(leds);
+        }
+        // sinelon
+        else if (mode == 14)
+        {
+            Animations::sinelon(leds);
+        }
+        // juggle
+        else if (mode == 15)
+        {
+            Animations::juggle(leds);
+        }
+        // bpm
+        else if (mode == 16)
+        {
+            Animations::bpm(leds);
+        }
+        // SleepMode?
+        else if (mode == 99)
+        {
+            delay(200);
         }
     }
 }
 
 void loop()
 {
-    delay(100);
     if (!System::mqttClient.connected())
     {
         System::reconnect();
     }
     System::mqttClient.loop();
 
-    // EVERY_N_SECONDS(5)
-    // {
-    //     Serial.print("loop() running on core ");
-    //     Serial.println(xPortGetCoreID());
-    // }
-    if(mode == 3){
-        EVERY_N_SECONDS(1)
+    if (mode == 3)
+    {
+        int nearest = RX5808::getNearestDrone();
+        if (nearest != 0)
         {
-            printMaxRssi();
+            Animations::setChannelColor(leds, nearest);
+        }
+        else
+        {
+            Animations::standby(leds);
         }
     }
+
     EVERY_N_MINUTES(5)
     {
         Serial.println("sending mqtt");
         System::mqttClient.publish("smartwhoopgates32/output", "still alive");
     }
-    EVERY_N_MINUTES(5)
+
+    EVERY_N_MINUTES(10)
     {
         checkUpdate();
     }
@@ -351,8 +410,7 @@ void checkUpdate()
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
     {
-        mode = 9;
-        Animations::off(leds);
+        mode = 99;
         Animations::update(leds);
         System::do_firmware_upgrade(url, digicert_pem_start);
     }
@@ -442,10 +500,10 @@ void initCustomEEPROM()
     PersistentData writeData = {
         "NONAME", // MQTT Topic
         {
-            {"SSID", "PASS", "MQTT"}, // WiFi 1
+            {"Attraktor", "blafablafa", "192.168.0.2"}, // WiFi 1
             {"SSID", "PASS", "MQTT"}, // WiFi 2
-            {"SSID", "PASS", "MQTT"}  // WiFi 3
+            {"SSID", "PASS", "MQTT"}, // WiFi 3
+            {"SSID", "PASS", "MQTT"}  // WiFi 4
         }};
     saveEEPROM(writeData);
-    esp_restart();
 }
