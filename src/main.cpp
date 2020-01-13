@@ -315,131 +315,114 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {
-        int lastmillis = millis();
-        // BootMode
-        if(mode == 1)
+        if (!System::mqttClient.connected()) System::reconnect();
+        System::mqttClient.loop();
+        ArduinoOTA.handle();
+
+        /*
+            ToDo: create loop tasks for librarys
+            System::loop();
+            Animations::loop();
+            and put here
+        */
+
+        int nearest = RX5808::getNearestDrone();
+        // WhoopMode
+        if (nearest != 0)
         {
-            checkUpdate();
-            Animations::startup(leds); // caution: BLOCKING!!
-            mode = 99;
+            Animations::setChannelColor(leds, nearest);
         }
-        // SleepMode?
+        else if (mode == 3)
+        {
+            Animations::standby(leds);
+        }
+        // PartyMode
+        else if (mode == 10)
+        {
+            Animations::party(leds);
+        }
+        // rainbow
+        else if (mode == 11)
+        {
+            Animations::rainbow(leds);
+        }
+        // rainbowWithGlitter
+        else if (mode == 12)
+        {
+            Animations::rainbowWithGlitter(leds);
+        }
+        // confetti
+        else if (mode == 13)
+        {
+            Animations::confetti(leds);
+        }
+        // sinelon
+        else if (mode == 14)
+        {
+            Animations::sinelon(leds);
+        }
+        // juggle
+        else if (mode == 15)
+        {
+            Animations::juggle(leds);
+        }
+        // bpm
+        else if (mode == 16)
+        {
+            Animations::bpm(leds);
+        }
+
+        // Debug StartupAnimation
+        else if (mode == 95)
+        {
+            Animations::startup(leds);
+        }
+        // Debug UpdateAnimation
+        else if (mode == 96)
+        {
+            Animations::update(leds);
+        }
+        // Debug EepromAnimation
+        else if (mode == 97)
+        {
+            Animations::initEEPROM(leds);
+        }
+        // Debug StandbyAnimation
+        else if (mode == 98)
+        {
+            Animations::standby(leds);
+        }
         else
         {
-            // ToDo: Terminate tast when idle?
-            RX5808::checkRssi();      // caution: BLOCKING!!
-            RX5808::checkDroneNear(); // caution: BLOCKING!!
+            vTaskDelay(10 / portTICK_PERIOD_MS);
         }
-        int newmillis = millis();
-        Serial.println("[TASK1] Execution Time: ");
-        Serial.println(newmillis-lastmillis);
     }
 }
 
 void loop()
 {
-    int lastmillis = millis();
-    if (!System::mqttClient.connected())
-    {
-        System::reconnect();
-    }
-    System::mqttClient.loop();
-
-    int nearest = RX5808::getNearestDrone();
-
-    EVERY_N_SECONDS(1)
-    {
-        if (nearest != 0)
-        {
-            Serial.print("Current Nearest: ");
-            Serial.println(nearest);
-        }
-    }
-    EVERY_N_SECONDS(1)
-    {
-        printMaxRssi();
-    }
-
-    // WhoopMode
-    if (nearest != 0)
-    {
-        Animations::setChannelColor(leds, nearest);
-    }
-    else if (mode == 3)
-    {
-        Animations::standby(leds);
-    }
-    // PartyMode
-    else if (mode == 10)
-    {
-        Animations::party(leds);
-    }
-    // rainbow
-    else if (mode == 11)
-    {
-        Animations::rainbow(leds);
-    }
-    // rainbowWithGlitter
-    else if (mode == 12)
-    {
-        Animations::rainbowWithGlitter(leds);
-    }
-    // confetti
-    else if (mode == 13)
-    {
-        Animations::confetti(leds);
-    }
-    // sinelon
-    else if (mode == 14)
-    {
-        Animations::sinelon(leds);
-    }
-    // juggle
-    else if (mode == 15)
-    {
-        Animations::juggle(leds);
-    }
-    // bpm
-    else if (mode == 16)
-    {
-        Animations::bpm(leds);
-    }
-
-    // Debug StartupAnimation
-    else if (mode == 95)
-    {
-        Animations::startup(leds);
-    }
-    // Debug UpdateAnimation
-    else if (mode == 96)
-    {
-        Animations::update(leds);
-    }
-    // Debug EepromAnimation
-    else if (mode == 97)
-    {
-        Animations::initEEPROM(leds);
-    }
-    // Debug StandbyAnimation
-    else if (mode == 98)
-    {
-        Animations::standby(leds);
-    }
-
-    EVERY_N_MINUTES(10)
+    //EVERY_N_SECONDS(1) printMaxRssi();
+    EVERY_N_MINUTES(10) checkUpdate();
+    // BootMode
+    if (mode == 1)
     {
         checkUpdate();
+        Animations::startup(leds); // caution: BLOCKING!!
+        mode = 99;
     }
-
-    ArduinoOTA.handle();
-    int newmillis = millis();
-    if (newmillis - lastmillis > 1)
+    // SleepMode?
+    else
     {
-        Serial.println("[LOOP] Execution Time: ");
-        Serial.println(newmillis - lastmillis);
+        /*
+            ToDo: create loop tasks for library
+            RX5808::loop();
+            and put here
+        */
+        RX5808::checkRssi();      // caution: BLOCKING!!
+        RX5808::checkDroneNear(); // caution: BLOCKING!!
     }
 }
-
+// ToDo: put inside system and call Animations::changeAnimation();
 void checkUpdate()
 {
     String message;
