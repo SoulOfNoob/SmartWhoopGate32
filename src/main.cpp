@@ -315,61 +315,59 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {
+        int lastmillis = millis();
         // BootMode
         if(mode == 1)
         {
             checkUpdate();
-            Animations::startup(leds);
+            Animations::startup(leds); // caution: BLOCKING!!
             mode = 99;
-        }
-        // WhoopMode
-        else if(mode == 3)
-        {
-            RX5808::checkRssi();        // caution: BLOCKING!!
-            RX5808::checkDroneNear();   // caution: BLOCKING!!
         }
         // SleepMode?
         else
         {
             // ToDo: Terminate tast when idle?
-            delay(200);
+            RX5808::checkRssi();      // caution: BLOCKING!!
+            RX5808::checkDroneNear(); // caution: BLOCKING!!
         }
+        int newmillis = millis();
+        Serial.println("[TASK1] Execution Time: ");
+        Serial.println(newmillis-lastmillis);
     }
 }
 
-// non blocking ONLY!
 void loop()
 {
+    int lastmillis = millis();
     if (!System::mqttClient.connected())
     {
         System::reconnect();
     }
     System::mqttClient.loop();
 
-    // WhoopMode
-    if (mode == 3)
+    int nearest = RX5808::getNearestDrone();
+
+    EVERY_N_SECONDS(1)
     {
-        int nearest = RX5808::getNearestDrone();
-        EVERY_N_SECONDS(1)
-        {
-            if(nearest != 0)
-            {
-                Serial.print("Current Nearest: ");
-                Serial.println(nearest);
-            }
-        }
-        EVERY_N_SECONDS(1)
-        {
-            printMaxRssi();
-        }
         if (nearest != 0)
         {
-            Animations::setChannelColor(leds, nearest);
+            Serial.print("Current Nearest: ");
+            Serial.println(nearest);
         }
-        else
-        {
-            Animations::standby(leds);
-        }
+    }
+    EVERY_N_SECONDS(1)
+    {
+        printMaxRssi();
+    }
+
+    // WhoopMode
+    if (nearest != 0)
+    {
+        Animations::setChannelColor(leds, nearest);
+    }
+    else if (mode == 3)
+    {
+        Animations::standby(leds);
     }
     // PartyMode
     else if (mode == 10)
@@ -434,6 +432,12 @@ void loop()
     }
 
     ArduinoOTA.handle();
+    int newmillis = millis();
+    if (newmillis - lastmillis > 1)
+    {
+        Serial.println("[LOOP] Execution Time: ");
+        Serial.println(newmillis - lastmillis);
+    }
 }
 
 void checkUpdate()
@@ -441,7 +445,7 @@ void checkUpdate()
     String message;
     message += "Online Since: ";
     message += millis();
-    message += "Millis, Current version :'";
+    message += " Millis, Current version :'";
     message += FIRMWARE_VERSION;
     message += "' Checking for updates..";
     char *url = System::checkForUpdate(digicert_pem_start);

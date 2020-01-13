@@ -328,25 +328,3 @@ int RX5808::getNearestDrone()
     }
     return nearestChannel;
 }
-void RX5808::setDroneColor(CRGB *leds)
-{
-    int newest = 0;
-    for (int i = 0; i < 8; i++)
-    {
-        if (droneNear[i] & (RX5808::droneNearTime[i] > newest))
-        {
-            if (debug)
-            {
-                Serial.print("Channel: ");
-                Serial.print(i);
-                Serial.println(" Dronenear! ");
-            }
-            newest = RX5808::droneNearTime[i];
-            Animations::setChannelColor(leds, i);
-        }
-    }
-    if (newest == 0)
-    {
-        Animations::standby(leds);
-    }
-}
