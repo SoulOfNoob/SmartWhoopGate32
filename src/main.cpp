@@ -408,12 +408,18 @@ void loop()
     EVERY_N_MINUTES(5)
     {
         Serial.println("sending mqtt");
-        System::mqttClient.publish("smartwhoopgates32/output", "still alive");
+        System::mqttClient.publish(System::statusTopic.c_str(), "still alive"); // + version
     }
 
     EVERY_N_MINUTES(10)
     {
+        String message;
+        message += "Version :'";
+        message += FIRMWARE_VERSION;
+        message += "' Checking for Updates..";
+        System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
         checkUpdate();
+        
     }
 
     ArduinoOTA.handle();
@@ -424,12 +430,16 @@ void checkUpdate()
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
     {
+        //update available
+        System::mqttClient.publish(System::statusTopic.c_str(), "Update Found.");
         mode = 99;
         Animations::update(leds);
         System::do_firmware_upgrade(url, digicert_pem_start);
     }
     else
     {
+        // no update
+        System::mqttClient.publish(System::statusTopic.c_str(), "No update Found.");
         Serial.println("No File");
     }
 }
