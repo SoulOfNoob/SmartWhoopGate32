@@ -21,6 +21,8 @@ with open('lib/System/firmware.h', 'w') as firmware_file:
 	firmware_file.write('#define UPDATE_JSON_URL "' + json_url + '"\n')
 	firmware_file.write('#define FIRMWARE_VERSION ' + str(new_version) + '\n')
 
+# building takes extremely long and delays commiting
+
 # print("post-commit: run build (this might take a while)")
 # stream = os.popen('platformio run')
 # output = stream.read()

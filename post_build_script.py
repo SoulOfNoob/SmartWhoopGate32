@@ -20,6 +20,7 @@ print(projenv)
 env.ProcessUnFlags("-DVECT_TAB_ADDR")
 env.Append(CPPDEFINES=("VECT_TAB_ADDR", 0x123456789))
 
+# copy compiled files to ota folder for webdeploy
 def copy_bin(source, target, env):
     print("after_build")
     print("copy: .pio/build/esp32doit-devkit-v1/firmware.bin TO ota/esp32/firmware.bin")
