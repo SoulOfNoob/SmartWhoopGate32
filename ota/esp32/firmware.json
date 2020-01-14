@@ -1,5 +1,5 @@
 {
-  "version": 2.0,
-  "json_url": "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.json",
-  "file_url": "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.bin"
+    "version": 2.0,
+    "json_url": "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.json",
+    "file_url": "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.bin"
 }
