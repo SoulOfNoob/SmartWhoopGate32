@@ -1,5 +1,8 @@
 # SmartWhoopGate32
 
+By [Marcel Verdult](https://github.com/marcelverdult)
+and [Jan Ryklikas](https://github.com/soulofnoob)
+
 ## Summary (Work in Progress)
 
   In this project we created "Smart" TinyWhoop drone gates for indoor flying.
