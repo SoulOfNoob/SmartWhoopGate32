@@ -178,8 +178,10 @@ char *System::checkForUpdate(const char *cert)
     {
         // parse the json file
         cJSON *json = cJSON_Parse(rcv_buffer);
-        if (json == NULL)
+        if (json == NULL){
             printf("downloaded file is not a valid json, aborting...\n");
+            System::mqttClient.publish(System::statusTopic.c_str(), "downloaded file is not a valid json, aborting...");
+        }
         else
         {
             cJSON *version = cJSON_GetObjectItemCaseSensitive(json, "version");
@@ -187,20 +189,27 @@ char *System::checkForUpdate(const char *cert)
 
             // check the version
             if (!cJSON_IsNumber(version))
+            {
                 printf("unable to read new version, aborting...\n");
+                System::mqttClient.publish(System::statusTopic.c_str(), "unable to read new version, aborting...");
+            }
             else
             {
                 double new_version = version->valuedouble;
+                String message;
+                message += "current firmware version ";
+                message += FIRMWARE_VERSION;
+                message += " is ";
+                if(new_version > FIRMWARE_VERSION) message += "lower";
+                if(new_version <= FIRMWARE_VERSION) message += "greater or equal";
+                message += " than the available one ";
+                message += new_version;
+                if(new_version > FIRMWARE_VERSION) message += ", upgrading...";
+                if(new_version <= FIRMWARE_VERSION) message += ", nothing to do...";
+                System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
                 if (new_version > FIRMWARE_VERSION)
                 {
                     printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...", FIRMWARE_VERSION, new_version);
-                    String message;
-                    message += "current firmware version ";
-                    message += FIRMWARE_VERSION;
-                    message += " is lower than the available one ";
-                    message += new_version;
-                    message += ", upgrading...";
-                    System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
                     if (cJSON_IsString(file) && (file->valuestring != NULL))
                     {
                         //System::do_firmware_upgrade(file->valuestring, cert);
