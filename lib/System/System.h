@@ -1,17 +1,16 @@
 #include <Arduino.h>
-#include <config.h>
+#include <firmware.h>
 #include <WiFi.h>
 #include <esp_https_ota.h>
 #include <PubSubClient.h>
 
-#define UPDATE_JSON_URL "https://raw.githubusercontent.com/SoulOfNoob/SmartWhoopGate32/master/ota/esp32/firmware.json"
 /*
     set FIRMWARE_VERSION to 0.0 for initial setup.
     initCustomEEPROM will be called 
     and after setting up wifi and mqtt server,
     current firmware will be loaded without resetting EEPROM.
 */
-#define FIRMWARE_VERSION 1.7
+//#define FIRMWARE_VERSION 1.8
 
 struct NetworkData
 {

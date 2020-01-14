@@ -286,8 +286,6 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
                     {
                         System::mqttClient.publish(System::statusTopic.c_str(), "Invalid Value");
                     }
-                    
-                    
                 }
                 else
                 {
@@ -320,9 +318,12 @@ void Task1code(void *pvParameters)
         ArduinoOTA.handle();
 
         /*
+            ToDo: create mqtt methods in System
+                publishToStatus(String message);
+                publishToGeneral(String message);
             ToDo: create loop tasks for librarys
-            System::loop();
-            Animations::loop();
+                System::loop();
+                Animations::loop();
             and put here
         */
 
@@ -532,7 +533,7 @@ void initCustomEEPROM()
     PersistentData writeData = {
         "NONAME", // MQTT Topic
         {
-            {"Attraktor", "blafablafa", "192.168.0.2"}, // WiFi 1
+            {"SSID", "PASS", "MQTT"}, // WiFi 1
             {"SSID", "PASS", "MQTT"}, // WiFi 2
             {"SSID", "PASS", "MQTT"}, // WiFi 3
             {"SSID", "PASS", "MQTT"}  // WiFi 4
