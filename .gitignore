@@ -3,3 +3,5 @@
 include/config.h
 helpers/SetGateEEPROM/SetGateEEPROM.ino
 helpers/notes.txt
+Doku/AnimationsDemo.MOV
+Doku/TriggerDemo.MOV
