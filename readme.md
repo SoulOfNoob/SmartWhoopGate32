@@ -10,7 +10,7 @@
 
   The different Lighting modes can be controlled via [MQTT](#mqtt-reference)
 
- ![AnimationGIF](Doku/WingAnimation.gif).
+ ![AnimationGIF](Doku/WingAnimation.gif)
 
 ## Parts List
 
