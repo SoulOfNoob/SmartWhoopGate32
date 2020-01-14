@@ -194,6 +194,13 @@ char *System::checkForUpdate(const char *cert)
                 if (new_version > FIRMWARE_VERSION)
                 {
                     printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...", FIRMWARE_VERSION, new_version);
+                    String message;
+                    message += "current firmware version ";
+                    message += FIRMWARE_VERSION;
+                    message += " is lower than the available one ";
+                    message += new_version;
+                    message += ", upgrading...";
+                    System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
                     if (cJSON_IsString(file) && (file->valuestring != NULL))
                     {
                         //System::do_firmware_upgrade(file->valuestring, cert);

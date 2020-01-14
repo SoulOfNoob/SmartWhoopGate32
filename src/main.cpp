@@ -432,12 +432,11 @@ void checkUpdate()
     message += " Millis, Current version :'";
     message += FIRMWARE_VERSION;
     message += "' Checking for updates..";
+    System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
     {
         //update available
-        message += " update found.";
-        System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
         mode = 99;
         Animations::update(leds);
         System::do_firmware_upgrade(url, digicert_pem_start);
@@ -445,8 +444,6 @@ void checkUpdate()
     else
     {
         // no update
-        message += " no update found.";
-        System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
         Serial.println("No File");
     }
 }

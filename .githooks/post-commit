@@ -2,24 +2,26 @@
 import json
 import os
 
-print("post-commit: iterating version number")
-with open('ota/esp32/firmware.json') as json_in:
-	data = json.load(json_in)
-	json_url = data['json_url']
-	old_version = data['version'];
-	new_version = round(old_version + 0.1, 1)
-	print('Old Version: ' + str(old_version))
-	print('New Version: ' + str(new_version))
+# Breaks JSON :/
 
-print("post-commit: writing version number to json")
-with open('ota/esp32/firmware.json', 'w') as json_out:
-	data['version'] = new_version
-	json.dump(data, json_out, indent=4)
+# print("post-commit: iterating version number")
+# with open('ota/esp32/firmware.json') as json_in:
+# 	data = json.load(json_in)
+# 	json_url = data['json_url']
+# 	old_version = data['version'];
+# 	new_version = round(old_version + 0.1, 1)
+# 	print('Old Version: ' + str(old_version))
+# 	print('New Version: ' + str(new_version))
 
-print("post-commit: writing version number and url to header")
-with open('lib/System/firmware.h', 'w') as firmware_file:
-	firmware_file.write('#define UPDATE_JSON_URL "' + json_url + '"\n')
-	firmware_file.write('#define FIRMWARE_VERSION ' + str(new_version) + '\n')
+# print("post-commit: writing version number to json")
+# with open('ota/esp32/firmware.json', 'w') as json_out:
+# 	data['version'] = new_version
+# 	json.dump(data, json_out, indent=2)
+
+# print("post-commit: writing version number and url to header")
+# with open('lib/System/firmware.h', 'w') as firmware_file:
+# 	firmware_file.write('#define UPDATE_JSON_URL "' + json_url + '"\n')
+# 	firmware_file.write('#define FIRMWARE_VERSION ' + str(new_version) + '\n')
 
 # building takes extremely long and delays commiting
 
