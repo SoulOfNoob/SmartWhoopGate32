@@ -66,3 +66,29 @@ and [Jan Ryklikas](https://github.com/soulofnoob)
   - `UPDATE`
 - RESTART
   - `RESTART`
+  
+## new MQTT Reference (work in progress)
+
+### Command Topics
+
+- gates/gateX/
+- gates/all/
+    - power
+        - `1` / `0`
+    - mode
+        - `n` | n = 11-16
+    - cmd
+        - `restart`
+        - `update`
+        - `reset rssi`
+    - set
+        - `autoreset = 1` / `0`
+        - `maxrssi[i] = n` | i = 0-7, n = 0-4000
+        - `name = gateX`
+        - `network[i] = ssid:pass:mqtt` | i = 0-4
+        
+### Status Topics
+
+- gates/gateX/status
+- gates/all/status
+    - `[gateX] message`
