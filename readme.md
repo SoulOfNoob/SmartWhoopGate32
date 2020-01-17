@@ -76,14 +76,15 @@ and [Jan Ryklikas](https://github.com/soulofnoob)
     - power
         - `1` / `0`
     - mode
-        - `n` | n = 11-16
+        - `val` | val = 11-16
     - cmd
         - `restart`
         - `update`
         - `reset rssi`
     - set
-        - `autoreset = 1` / `0`
-        - `maxrssi[i] = n` | i = 0-7, n = 0-4000
+        - `<variable> = <value>`
+        - `rssi_autoreset = val` | val = 0/1
+        - `maxrssi[i] = val` | i = 0-7, val = 0-4000
         - `name = gateX`
         - `network[i] = ssid:pass:mqtt` | i = 0-4
         
