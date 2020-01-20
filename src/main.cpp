@@ -26,8 +26,9 @@ CRGB leds[NUM_LEDS];
 uint8_t mode = 0;
 bool power = 1;
 bool powerFlag = 1;
+bool logRSSI = 0;
 
-    PersistentData persistentData;
+PersistentData persistentData;
 
 // Declarations
 void Task1code(void *pvParameters);
@@ -36,7 +37,8 @@ void handleCommand(char *topic, byte *message, unsigned int length);
 void checkUpdate();
 void saveEEPROM(PersistentData argument);
 PersistentData loadEEPROM();
-void printMaxRssi();
+void logRssi();
+void logMaxRssi();
 void printEEPROM(PersistentData persistentData);
 void initCustomEEPROM();
 
@@ -58,7 +60,7 @@ void setup()
 
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     Animations::init(leds);
-    if(FIRMWARE_VERSION == 0.0) initCustomEEPROM();
+    if (FIRMWARE_VERSION == 0.0) initCustomEEPROM();
     persistentData = loadEEPROM();
 
     // init librarys
@@ -132,52 +134,49 @@ void handleCommand(char *topic, byte *message, unsigned int length)
     }
     Serial.println();
 
-    if(topicTemp.indexOf("power") >= 0)
+    if (topicTemp.indexOf("power") >= 0)
     {
-        if(messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
+        if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
         {
             power = false;
-            Serial.println("REC: OFF");
         }
-        else if(messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
+        else if (messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
         {
             power = true;
-            Serial.println("REC: ON");
         }
-        else if(messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
+        else if (messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
         {
             power = !power;
-            Serial.println("REC: TOGGLE");
         }
 
         System::sendStat("power", (String) power);
     }
-    else if(topicTemp.indexOf("mode") >= 0)
+    else if (topicTemp.indexOf("mode") >= 0)
     {
-        if(messageTemp.toInt() > 0) mode = messageTemp.toInt();
+        if (messageTemp.toInt() > 0) mode = messageTemp.toInt();
         System::sendStat("mode", (String) mode);
     }
-    else if(topicTemp.indexOf("brightness") >= 0)
+    else if (topicTemp.indexOf("brightness") >= 0)
     {
-        if(messageTemp.toInt() >= 0) Animations::brightness = messageTemp.toInt();
+        if (messageTemp.toInt() >= 0) Animations::brightness = messageTemp.toInt();
         System::sendStat("brightness", (String) Animations::brightness);
     }
-    else if(topicTemp.indexOf("restart") >= 0)
+    else if (topicTemp.indexOf("restart") >= 0)
     {
         System::sendStat("restart", "OK");
         esp_restart();
     }
-    else if(topicTemp.indexOf("update") >= 0)
+    else if (topicTemp.indexOf("update") >= 0)
     {
         System::sendStat("update", "OK");
         checkUpdate();
     }
-    else if(topicTemp.indexOf("rssi_reset") >= 0)
+    else if (topicTemp.indexOf("resetRSSI") >= 0)
     {
         for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
-        System::sendStat("rssi_reset", "OK");
+        System::sendStat("resetRSSI", "OK");
     }
-    else if(topicTemp.indexOf("rssi_autoreset") >= 0)
+    else if (topicTemp.indexOf("autoresetRSSI") >= 0)
     {
         if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
         {
@@ -191,13 +190,32 @@ void handleCommand(char *topic, byte *message, unsigned int length)
         {
             RX5808::autoReset = !RX5808::autoReset;
         }
-        System::sendStat("rssi_autoreset", (String) RX5808::autoReset);
+        System::sendStat("autoresetRSSI", (String) RX5808::autoReset);
     }
-    else if(topicTemp.indexOf("maxrssi") >= 0)
+    else if (topicTemp.indexOf("maxRSSI") >= 0)
     {
         // ToDo
+        logMaxRssi();
     }
-    else if(topicTemp.indexOf("name") >= 0)
+    else if (topicTemp.indexOf("logRSSI") >= 0)
+    {
+        if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
+        {
+            logRSSI = false;
+        }
+        else if (messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
+        {
+            logRSSI = true;
+        }
+        else if (messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
+        {
+            logRSSI = !logRSSI;
+        }
+
+        System::sendStat("logRSSI", (String)logRSSI);
+        logRssi();
+    }
+    else if (topicTemp.indexOf("name") >= 0)
     {
         String name = messageTemp;
         if (name.length() > 0)
@@ -212,7 +230,7 @@ void handleCommand(char *topic, byte *message, unsigned int length)
             System::sendStat("name", "Invalid value");
         }
     }
-    else if(topicTemp.indexOf("network") >= 0)
+    else if (topicTemp.indexOf("network") >= 0)
     {
         uint8_t networkStart = topicTemp.indexOf("network");
         uint8_t network = topicTemp.substring(networkStart + 7, networkStart + 8).toInt();
@@ -389,7 +407,10 @@ void loop()
             and put here
         */
         RX5808::checkRssi();      // caution: BLOCKING!!
-        System::sendRssi("0: " + (String)RX5808::rssi[0] + " 1: " + (String)RX5808::rssi[1] + " 2: " + (String)RX5808::rssi[2] + " 3: " + (String)RX5808::rssi[3] + " 4: " + (String)RX5808::rssi[4] + " 5: " + (String)RX5808::rssi[5] + " 6: " + (String)RX5808::rssi[6] + " 7: " + (String)RX5808::rssi[7]);
+        if (logRSSI)
+        {
+            logRssi();
+        }
         RX5808::checkDroneNear(); // caution: BLOCKING!!
     }
 }
@@ -421,7 +442,21 @@ void checkUpdate()
     }
 }
 
-void printMaxRssi()
+void logRssi()
+{
+    int *rssi = RX5808::rssi;
+    String values = "Values: ";
+    for (int i = 0; i < 8; i++)
+    {
+        values += i + 1;
+        values += ": ";
+        values += rssi[i];
+        values += ", ";
+    }
+    System::sendRssi(values);
+}
+
+void logMaxRssi()
 {
     int *maxRssi = RX5808::maxRssi;
     String values = "Values: ";
@@ -432,7 +467,7 @@ void printMaxRssi()
         values += maxRssi[i];
         values += ", ";
     }
-    System::sendTele(values);
+    System::sendRssi(values);
 }
 
 // ToDo: EEPROM stuff in system.cpp

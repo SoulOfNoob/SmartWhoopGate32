@@ -178,8 +178,11 @@ void System::reconnect()
             Serial.println("connected");
             // Subscribe
             mqttClient.subscribe(genericCmndTopic.c_str());
+            Serial.println(("Subscribed: " + genericCmndTopic).c_str());
             mqttClient.subscribe(fallbackCmndTopic.c_str());
+            Serial.println(("Subscribed: " + fallbackCmndTopic).c_str());
             mqttClient.subscribe(specificCmndTopic.c_str());
+            Serial.println(("Subscribed: " + specificCmndTopic).c_str());
 
             sendTele("Ready to Receive");
         }
