@@ -8,28 +8,36 @@
 class Animations
 {
 public:
+    static void init(CRGB *leds);
+    static void loop();
     static void on();
     static void off();
-    static void startup(CRGB *leds);
-    static void update(CRGB *leds);
-    static void standby(CRGB *leds);
-    static void initEEPROM(CRGB *leds);
-    static void circle(CRGB *leds, CRGB color);
-    static void party(CRGB *leds);
-    static void pulseCircleRGB(CRGB *leds);
-    static void wingRotationRGB(CRGB * leds);
-    static void rainbow(CRGB *leds);
-    static void rainbowWithGlitter(CRGB *leds);
-    static void addGlitter(CRGB *leds, fract8 chanceOfGlitter);
-    static void confetti(CRGB *leds);
-    static void sinelon(CRGB *leds);
-    static void bpm(CRGB *leds);
-    static void juggle(CRGB *leds);
+    static void setAnimation(void (*f)());
 
-    static void setChannelColor(CRGB *leds, uint8_t channel);
+    static void startup();
+    static void update();
+    static void standby();
+    static void initEEPROM();
+    static void circle(CRGB color);
+    static void party();
+    static void pulseCircleRGB();
+    static void wingRotationRGB();
+    static void rainbow();
+    static void rainbowWithGlitter();
+    static void addGlitter(fract8 chanceOfGlitter);
+    static void confetti();
+    static void sinelon();
+    static void bpm();
+    static void juggle();
+
+    static void setChannelColor(uint8_t channel);
     static uint8_t doOverflow(uint8_t value, uint8_t min, uint8_t max);
 
+    static void (*animation)();
+
 private:
+    static CRGB *_leds;
+
     static const CRGB standbyColor;
     static const CRGB channelColors[8];
     static unsigned int ledTime;

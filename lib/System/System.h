@@ -30,6 +30,7 @@ class System
 {
 public:
     static void init(PersistentData *persistentData);
+    static void loop();
 
     static void setup_wifi(PersistentData *persistentData);
     static void reconnect();
@@ -39,15 +40,26 @@ public:
     static WiFiClient wifiClient;
     static PubSubClient mqttClient;
 
+    static String MQTTPrefix;
+
     static String espid;
     static String fallbackId;
-    static String fallbackTopic;
-    static String cmdTopic;
-    static String statusTopic;
 
-    static char rcv_buffer[200];
-    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
+    static void sendStat(String command, String message);
+    static void sendTele(String message);
 
 private:
     static PersistentData *_persistentData;
+    static char rcv_buffer[200];
+    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
+
+    static String genericCmndTopic;
+    static String fallbackCmndTopic;
+    static String specificCmndTopic;
+    static String genericStatTopic;
+    static String fallbackStatTopic;
+    static String specificStatTopic;
+    static String genericTeleTopic;
+    static String fallbackTeleTopic;
+    static String specificTeleTopic;
 };

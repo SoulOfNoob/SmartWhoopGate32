@@ -66,30 +66,32 @@ and [Jan Ryklikas](https://github.com/soulofnoob)
   - `UPDATE`
 - RESTART
   - `RESTART`
-  
-## new MQTT Reference (work in progress)
+
+## new MQTT Reference
 
 ### Command Topics
 
-- gates/gateX/
-- gates/all/
-    - power
-        - `1` / `0`
-    - mode
-        - `val` | val = 11-16
-    - cmd
-        - `restart`
-        - `update`
-        - `reset rssi`
-    - set
-        - `<variable> = <value>`
-        - `rssi_autoreset = val` | val = 0/1
-        - `maxrssi[i] = val` | i = 0-7, val = 0-4000
-        - `name = gateX`
-        - `network[i] = ssid:pass:mqtt` | i = 0-4
-        
+gates/gate&lt;x>/cmnd/%command%
+gates/all/cmnd/%command%
+  
+| Command        | Parameters                                         |
+| ----------     | -------------------------------------------------- |
+| power          | `0` / `off` = turn OFF <br/> `1` / `on` = turn ON <br/> `2` / `toggle` = toggle ON/OFF |
+| mode           | `11..16` = set LED mode                            |
+| brightness     | `0..255` = set LED brightness                      |
+| restart        | send empty message to trigger restart              |
+| update         | send empty message to trigger update               |
+| rssi_reset     | send empty message to trigger rssi reset           |
+| rssi_autoreset | `0` / `off` = turn OFF <br/> `1` / `on` = turn ON  |
+| maxrssi&lt;x>  | `0..4000` <br/> x = `0..7`                         |
+| name           | `<name>`                                           |
+| network&lt;x>  | `<ssid>;<pass>;<mqtt>` <br/> x = `0..4`            |
+
 ### Status Topics
 
-- gates/gateX/status
-- gates/all/status
-    - `[gateX] message`
+gates/gate&lt;x>/stat/%command%
+gates/all/stat/%command%
+
+### telemetry Topics
+
+gates/gate&lt;x>/tele

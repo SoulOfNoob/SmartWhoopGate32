@@ -30,7 +30,7 @@ PersistentData persistentData;
 // Declarations
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
-void evaluateMQTTMessage(char *topic, byte *message, unsigned int length);
+void handleCommand(char *topic, byte *message, unsigned int length);
 void checkUpdate();
 void saveEEPROM(PersistentData argument);
 PersistentData loadEEPROM();
@@ -55,6 +55,7 @@ void setup()
     Serial.println(FIRMWARE_VERSION);
 
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+    Animations::init(leds);
     if(FIRMWARE_VERSION == 0.0) initCustomEEPROM();
     persistentData = loadEEPROM();
 
@@ -62,7 +63,7 @@ void setup()
     System::init(&persistentData);
     System::setup_wifi(&persistentData);
 
-    System::mqttClient.setCallback(evaluateMQTTMessage);
+    System::mqttClient.setCallback(handleCommand);
     RX5808::init();
 
     //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
@@ -114,7 +115,7 @@ void setup()
     mode = 1;
 }
 
-void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
+void handleCommand(char *topic, byte *message, unsigned int length)
 {
     Serial.print("Message arrived on topic: ");
     Serial.print(topic);
@@ -135,21 +136,21 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
             Serial.println("Turning LEDs ON");
             Animations::on();
             mode = 3;
-            System::mqttClient.publish(System::statusTopic.c_str(), "LEDs ON");
+            System::sendStat("", "LEDs ON");
         }
         else if (messageTemp.indexOf("OFF") >= 0)
         {
             Serial.println("Turning LEDs OFF");
             Animations::off();
-            mode = 99;
-            System::mqttClient.publish(System::statusTopic.c_str(), "LEDs OFF");
+            mode = 2;
+            System::sendStat("", "LEDs OFF");
         }
         else if (messageTemp.indexOf("PARTY") >= 0)
         {
             Serial.println("Turning PARTYMODE ON");
             Animations::on();
             mode = 10;
-            System::mqttClient.publish(System::statusTopic.c_str(), "PARTYMODE ON");
+            System::sendStat("", "PARTYMODE ON");
         }
         else if (messageTemp.indexOf("MODE") >= 0)
         {
@@ -164,7 +165,7 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
                     Serial.println(value);
                     Animations::on();
                     mode = value;
-                    System::mqttClient.publish(System::statusTopic.c_str(), "Mode Set");
+                    System::sendStat("", "Mode Set");
                 }
             }
         }
@@ -178,13 +179,13 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
             {
                 Serial.println("Turning AUTORESET ON");
                 RX5808::autoReset = true;
-                System::mqttClient.publish(System::statusTopic.c_str(), "AUTORESET ON");
+                System::sendStat("", "AUTORESET ON");
             }
             else if (messageTemp.indexOf("OFF") >= 0)
             {
                 Serial.println("Turning AUTORESET OFF");
                 RX5808::autoReset = false;
-                System::mqttClient.publish(System::statusTopic.c_str(), "AUTORESET OFF");
+                System::sendStat("", "AUTORESET OFF");
             }
         }
         else if (messageTemp.indexOf("RESET") >= 0)
@@ -205,16 +206,16 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
                 if (channel >= 0 && value >= 0)
                 {
                     RX5808::maxRssi[channel] = value;
-                    System::mqttClient.publish(System::statusTopic.c_str(), "Set");
+                    System::sendStat("", "Set");
                 }
                 else
                 {
-                    System::mqttClient.publish(System::statusTopic.c_str(), "Invalid value");
+                    System::sendStat("", "Invalid value");
                 }
             }
             else
             {
-                System::mqttClient.publish(System::statusTopic.c_str(), "Invalid format");
+                System::sendStat("","Invalid format");
             }
         }
         printMaxRssi();
@@ -238,17 +239,17 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
                     {
                         persistentData.espid = name;
                         saveEEPROM(persistentData);
-                        System::mqttClient.publish(System::statusTopic.c_str(), "Set");
+                        System::sendStat("", "Set");
                         esp_restart();
                     }
                     else
                     {
-                        System::mqttClient.publish(System::statusTopic.c_str(), "Invalid value");
+                        System::sendStat("", "Invalid value");
                     }
                 }
                 else
                 {
-                    System::mqttClient.publish(System::statusTopic.c_str(), "Invalid format");
+                    System::sendStat("","Invalid format");
                 }
             }
             if (messageTemp.indexOf("NETWORK") >= 0)
@@ -280,16 +281,16 @@ void evaluateMQTTMessage(char *topic, byte *message, unsigned int length)
                         Serial.print("mqtt: ");
                         Serial.println(mqtt);
                         saveEEPROM(persistentData);
-                        System::mqttClient.publish(System::statusTopic.c_str(), "Set");
+                        System::sendStat("", "Set");
                     }
                     else
                     {
-                        System::mqttClient.publish(System::statusTopic.c_str(), "Invalid Value");
+                        System::sendStat("", "Invalid value");
                     }
                 }
                 else
                 {
-                    System::mqttClient.publish(System::statusTopic.c_str(), "Invalid format");
+                    System::sendStat("","Invalid format");
                 }
             }
         }
@@ -312,15 +313,12 @@ void Task1code(void *pvParameters)
     Serial.println(xPortGetCoreID());
 
     for (;;)
-    {
-        if (!System::mqttClient.connected()) System::reconnect();
-        System::mqttClient.loop();
+    {        
+        System::loop();
         ArduinoOTA.handle();
+        //Animations::loop();
 
         /*
-            ToDo: create mqtt methods in System
-                publishToStatus(String message);
-                publishToGeneral(String message);
             ToDo: create loop tasks for librarys
                 System::loop();
                 Animations::loop();
@@ -329,73 +327,82 @@ void Task1code(void *pvParameters)
 
         int nearest = RX5808::getNearestDrone();
         // WhoopMode
-        if (nearest != 0)
+        if (mode == 2)
         {
-            Animations::setChannelColor(leds, nearest);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+        else if (nearest != 0)
+        {
+            Animations::setChannelColor(nearest);
         }
         else if (mode == 3)
         {
-            Animations::standby(leds);
+            Animations::standby();
         }
         // PartyMode
         else if (mode == 10)
         {
-            Animations::party(leds);
+            Animations::party();
         }
         // rainbow
         else if (mode == 11)
         {
-            Animations::rainbow(leds);
+            Animations::rainbow();
         }
         // rainbowWithGlitter
         else if (mode == 12)
         {
-            Animations::rainbowWithGlitter(leds);
+            Animations::rainbowWithGlitter();
         }
         // confetti
         else if (mode == 13)
         {
-            Animations::confetti(leds);
+            Animations::confetti();
         }
         // sinelon
         else if (mode == 14)
         {
-            Animations::sinelon(leds);
+            Animations::sinelon();
         }
         // juggle
         else if (mode == 15)
         {
-            Animations::juggle(leds);
+            Animations::juggle();
         }
         // bpm
         else if (mode == 16)
         {
-            Animations::bpm(leds);
+            Animations::bpm();
+        }
+        // bpm new
+        else if (mode == 17)
+        {
+            Animations::animation = &Animations::bpm;
         }
 
         // Debug StartupAnimation
         else if (mode == 95)
         {
-            Animations::startup(leds);
+            Animations::startup();
         }
         // Debug UpdateAnimation
         else if (mode == 96)
         {
-            Animations::update(leds);
+            Animations::update();
         }
         // Debug EepromAnimation
         else if (mode == 97)
         {
-            Animations::initEEPROM(leds);
+            Animations::initEEPROM();
         }
         // Debug StandbyAnimation
         else if (mode == 98)
         {
-            Animations::standby(leds);
+            Animations::standby();
         }
         else
         {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     }
 }
@@ -408,8 +415,8 @@ void loop()
     if (mode == 1)
     {
         checkUpdate();
-        Animations::startup(leds); // caution: BLOCKING!!
-        mode = 99;
+        Animations::startup(); // caution: BLOCKING!!
+        mode = 2;
     }
     // SleepMode?
     else
@@ -427,18 +434,18 @@ void loop()
 void checkUpdate()
 {
     String message;
-    message += "Online Since: ";
+    message += "uptime: ";
     message += millis();
-    message += " Millis, Current version :'";
+    message += " ms, FW: ";
     message += FIRMWARE_VERSION;
-    message += "' Checking for updates..";
-    System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
+    message += ". Checking for updates..";
+    System::sendTele(message);
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
     {
         //update available
-        mode = 99;
-        Animations::update(leds);
+        mode = 2;
+        Animations::update();
         System::do_firmware_upgrade(url, digicert_pem_start);
     }
     else
@@ -459,7 +466,7 @@ void printMaxRssi()
         values += maxRssi[i];
         values += ", ";
     }
-    System::mqttClient.publish(System::statusTopic.c_str(), values.c_str());
+    System::sendTele(values);
 }
 
 // ToDo: EEPROM stuff in system.cpp
@@ -525,7 +532,7 @@ void printEEPROM(PersistentData eData)
 // put in extra file
 void initCustomEEPROM()
 {
-    Animations::circle(leds, CRGB::Blue);
+    Animations::circle(CRGB::Blue);
     // Put your WiFi Settings here:
     PersistentData writeData = {
         "NONAME", // MQTT Topic

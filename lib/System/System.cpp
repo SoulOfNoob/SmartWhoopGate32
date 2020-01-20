@@ -13,12 +13,26 @@ PubSubClient System::mqttClient(System::wifiClient);
 
 String System::espid;
 String System::fallbackId;
-String System::fallbackTopic;
-String System::cmdTopic;
-String System::statusTopic;
+String System::MQTTPrefix = "gates";
+
+String System::genericCmndTopic;
+String System::fallbackCmndTopic;
+String System::specificCmndTopic;
+String System::genericStatTopic;
+String System::fallbackStatTopic;
+String System::specificStatTopic;
+String System::genericTeleTopic;
+String System::fallbackTeleTopic;
+String System::specificTeleTopic;
 
 // receive buffer
 char System::rcv_buffer[200];
+
+void System::loop()
+{
+    if (!mqttClient.connected()) reconnect();
+    mqttClient.loop();
+}
 
 // esp_http_client event handler
 esp_err_t System::_http_event_handler(esp_http_client_event_t *evt)
@@ -106,10 +120,19 @@ void System::setup_wifi(PersistentData *persistentData)
             }
 
             espid = persistentData->espid;
-            cmdTopic = "Gates/" + espid + "/cmd";
-            statusTopic = "Gates/" + espid + "/status";
 
-            fallbackTopic = "Gates/" + fallbackId + "/cmd";
+            genericCmndTopic = MQTTPrefix + "/all/cmnd";
+            fallbackCmndTopic = MQTTPrefix + "/" + fallbackId + "/cmnd";
+            specificCmndTopic = MQTTPrefix + "/" + espid + "/cmnd";
+            
+            genericStatTopic = MQTTPrefix + "/all/stat";
+            fallbackStatTopic = MQTTPrefix + "/" + fallbackId + "/stat";
+            specificStatTopic = MQTTPrefix + "/" + espid + "/stat";
+
+            genericTeleTopic = MQTTPrefix + "/all/tele";
+            fallbackTeleTopic = MQTTPrefix + "/" + fallbackId + "/tele";
+            specificTeleTopic = MQTTPrefix + "/" + espid + "/tele";
+
             // ToDo: MAKE BETTER
             char hostname_c[64];
             String hostname_s = "Drone_" + espid;
@@ -120,6 +143,19 @@ void System::setup_wifi(PersistentData *persistentData)
             break;
         }
     }
+}
+
+void System::sendStat(String command, String message)
+{
+    mqttClient.publish((genericStatTopic + "/" + command).c_str(), ("[" + espid + "] " + message).c_str());
+    mqttClient.publish((fallbackStatTopic + "/" + command).c_str(), ("[" + fallbackId + "] " + message).c_str());
+    mqttClient.publish((specificStatTopic + "/" + command).c_str(), ("[" + espid + "] " + message).c_str());
+}
+void System::sendTele(String message)
+{
+    mqttClient.publish(genericTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
+    mqttClient.publish(fallbackTeleTopic.c_str(), ("[" + fallbackId + "] " + message).c_str());
+    mqttClient.publish(specificTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
 }
 
 void System::reconnect()
@@ -134,17 +170,11 @@ void System::reconnect()
         {
             Serial.println("connected");
             // Subscribe
-            mqttClient.subscribe("Gates/cmd");
-            Serial.println("subscribed to: Gates/cmd");
-            mqttClient.subscribe(System::fallbackTopic.c_str());
-            Serial.print("subscribed to: ");
-            Serial.println(System::fallbackTopic);
-            mqttClient.subscribe(System::cmdTopic.c_str());
-            Serial.print("subscribed to: ");
-            Serial.println(System::cmdTopic);
-            mqttClient.publish(System::statusTopic.c_str(), "Ready to Receive");
-            Serial.print("published to: ");
-            Serial.println(System::statusTopic);
+            mqttClient.subscribe(genericCmndTopic.c_str());
+            mqttClient.subscribe(fallbackCmndTopic.c_str());
+            mqttClient.subscribe(specificCmndTopic.c_str());
+
+            sendTele("Ready to Receive");
         }
         else
         {
@@ -180,7 +210,7 @@ char *System::checkForUpdate(const char *cert)
         cJSON *json = cJSON_Parse(rcv_buffer);
         if (json == NULL){
             printf("downloaded file is not a valid json, aborting...\n");
-            System::mqttClient.publish(System::statusTopic.c_str(), "downloaded file is not a valid json, aborting...");
+            sendTele("downloaded file is not a valid json, aborting...");
         }
         else
         {
@@ -191,22 +221,20 @@ char *System::checkForUpdate(const char *cert)
             if (!cJSON_IsNumber(version))
             {
                 printf("unable to read new version, aborting...\n");
-                System::mqttClient.publish(System::statusTopic.c_str(), "unable to read new version, aborting...");
+                sendTele("unable to read new version, aborting...");
             }
             else
             {
                 double new_version = version->valuedouble;
                 String message;
-                message += "current firmware version ";
+                message += "FW: ";
                 message += FIRMWARE_VERSION;
-                message += " is ";
-                if(new_version > FIRMWARE_VERSION) message += "lower";
-                if(new_version <= FIRMWARE_VERSION) message += "greater or equal";
-                message += " than the available one ";
+                if(new_version > FIRMWARE_VERSION) message += " < ";
+                if(new_version <= FIRMWARE_VERSION) message += " >= ";
                 message += new_version;
-                if(new_version > FIRMWARE_VERSION) message += ", upgrading...";
-                if(new_version <= FIRMWARE_VERSION) message += ", nothing to do...";
-                System::mqttClient.publish(System::statusTopic.c_str(), message.c_str());
+                if(new_version > FIRMWARE_VERSION) message += ". upgrading...";
+                if(new_version <= FIRMWARE_VERSION) message += ". nothing to do...";
+                sendTele(message);
                 if (new_version > FIRMWARE_VERSION)
                 {
                     printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...", FIRMWARE_VERSION, new_version);
@@ -237,7 +265,7 @@ char *System::checkForUpdate(const char *cert)
 esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
 {
     Serial.println("downloading and installing new firmware ...");
-    mqttClient.publish("jryesp32/output", "Starting Update");
+    sendTele("Starting Update");
 
     esp_http_client_config_t config = {};
     config.url = url;
@@ -248,7 +276,7 @@ esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
     if (ret == ESP_OK)
     {
         Serial.println("OTA OK, restarting...");
-        mqttClient.publish("jryesp32/output", "Update Done");
+        sendTele("Update Done");
         delay(1000);
         esp_restart();
     }

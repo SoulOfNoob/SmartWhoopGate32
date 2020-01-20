@@ -9,7 +9,7 @@ public:
     static void checkRssi();
     static void checkDroneNear();
     static int getNearestDrone();
-    static void setDroneColor(CRGB *leds);
+    static void setDroneColor();
 
     static byte defaultBrightness;
     static bool autoReset;
