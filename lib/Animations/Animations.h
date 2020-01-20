@@ -34,6 +34,7 @@ public:
     static uint8_t doOverflow(uint8_t value, uint8_t min, uint8_t max);
 
     static void (*animation)();
+    static uint8_t brightness;
 
 private:
     static CRGB *_leds;
@@ -42,7 +43,6 @@ private:
     static const CRGB channelColors[8];
     static unsigned int ledTime;
     static uint8_t defaultBrightness;
-    static uint8_t brightness;
 
     static bool offset;
 };

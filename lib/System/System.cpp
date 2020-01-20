@@ -24,9 +24,10 @@ String System::specificStatTopic;
 String System::genericTeleTopic;
 String System::fallbackTeleTopic;
 String System::specificTeleTopic;
+String System::specificRssiTopic;
 
-// receive buffer
-char System::rcv_buffer[200];
+    // receive buffer
+    char System::rcv_buffer[200];
 
 void System::loop()
 {
@@ -121,10 +122,10 @@ void System::setup_wifi(PersistentData *persistentData)
 
             espid = persistentData->espid;
 
-            genericCmndTopic = MQTTPrefix + "/all/cmnd";
-            fallbackCmndTopic = MQTTPrefix + "/" + fallbackId + "/cmnd";
-            specificCmndTopic = MQTTPrefix + "/" + espid + "/cmnd";
-            
+            genericCmndTopic = MQTTPrefix + "/all/cmnd/#";
+            fallbackCmndTopic = MQTTPrefix + "/" + fallbackId + "/cmnd/#";
+            specificCmndTopic = MQTTPrefix + "/" + espid + "/cmnd/#";
+
             genericStatTopic = MQTTPrefix + "/all/stat";
             fallbackStatTopic = MQTTPrefix + "/" + fallbackId + "/stat";
             specificStatTopic = MQTTPrefix + "/" + espid + "/stat";
@@ -132,6 +133,8 @@ void System::setup_wifi(PersistentData *persistentData)
             genericTeleTopic = MQTTPrefix + "/all/tele";
             fallbackTeleTopic = MQTTPrefix + "/" + fallbackId + "/tele";
             specificTeleTopic = MQTTPrefix + "/" + espid + "/tele";
+
+            specificRssiTopic = MQTTPrefix + "/" + espid + "/rssi";
 
             // ToDo: MAKE BETTER
             char hostname_c[64];
@@ -156,6 +159,10 @@ void System::sendTele(String message)
     mqttClient.publish(genericTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
     mqttClient.publish(fallbackTeleTopic.c_str(), ("[" + fallbackId + "] " + message).c_str());
     mqttClient.publish(specificTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
+}
+void System::sendRssi(String message)
+{
+    mqttClient.publish(specificRssiTopic.c_str(), ("[" + espid + "] " + message).c_str());
 }
 
 void System::reconnect()

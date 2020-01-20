@@ -15,6 +15,7 @@ public:
     static bool autoReset;
 
     static int maxRssi[8];
+    static int rssi[8];
 
 private:
     static void setupSPIpins();
@@ -26,7 +27,6 @@ private:
 
     static const int rssiMinimum = 2500;
     static uint16_t frequency;
-    static int rssi[8];
     static bool droneNear[8];
     static int droneNearTime[8];
     static bool debug;

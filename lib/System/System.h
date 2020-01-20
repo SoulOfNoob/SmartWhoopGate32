@@ -47,6 +47,7 @@ public:
 
     static void sendStat(String command, String message);
     static void sendTele(String message);
+    static void sendRssi(String message);
 
 private:
     static PersistentData *_persistentData;
@@ -62,4 +63,5 @@ private:
     static String genericTeleTopic;
     static String fallbackTeleTopic;
     static String specificTeleTopic;
+    static String specificRssiTopic;
 };

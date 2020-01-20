@@ -24,8 +24,10 @@ TaskHandle_t Task2;
 CRGB leds[NUM_LEDS];
 
 uint8_t mode = 0;
+bool power = 1;
+bool powerFlag = 1;
 
-PersistentData persistentData;
+    PersistentData persistentData;
 
 // Declarations
 void Task1code(void *pvParameters);
@@ -121,6 +123,7 @@ void handleCommand(char *topic, byte *message, unsigned int length)
     Serial.print(topic);
     Serial.print(". Message: ");
     String messageTemp;
+    String topicTemp = topic;
 
     for (int i = 0; i < length; i++)
     {
@@ -129,180 +132,119 @@ void handleCommand(char *topic, byte *message, unsigned int length)
     }
     Serial.println();
 
-    if (messageTemp.indexOf("LED") >= 0)
+    if(topicTemp.indexOf("power") >= 0)
     {
-        if (messageTemp.indexOf("ON") >= 0)
+        if(messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
         {
-            Serial.println("Turning LEDs ON");
-            Animations::on();
-            mode = 3;
-            System::sendStat("", "LEDs ON");
+            power = false;
+            Serial.println("REC: OFF");
         }
-        else if (messageTemp.indexOf("OFF") >= 0)
+        else if(messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
         {
-            Serial.println("Turning LEDs OFF");
-            Animations::off();
-            mode = 2;
-            System::sendStat("", "LEDs OFF");
+            power = true;
+            Serial.println("REC: ON");
         }
-        else if (messageTemp.indexOf("PARTY") >= 0)
+        else if(messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
         {
-            Serial.println("Turning PARTYMODE ON");
-            Animations::on();
-            mode = 10;
-            System::sendStat("", "PARTYMODE ON");
+            power = !power;
+            Serial.println("REC: TOGGLE");
         }
-        else if (messageTemp.indexOf("MODE") >= 0)
-        {
-            int valueStart = messageTemp.indexOf("<");
-            int valueEnd = messageTemp.indexOf(">");
-            if (valueStart > 0 && valueEnd > 0)
-            {
-                int value = messageTemp.substring(valueStart + 1, valueEnd).toInt();
-                if (value > 10)
-                {
-                    Serial.print("Changing Mode to: ");
-                    Serial.println(value);
-                    Animations::on();
-                    mode = value;
-                    System::sendStat("", "Mode Set");
-                }
-            }
-        }
+
+        System::sendStat("power", (String) power);
     }
-    // SETMAXRSSI [1] = <1234>"
-    else if (messageTemp.indexOf("MAXRSSI") >= 0)
+    else if(topicTemp.indexOf("mode") >= 0)
     {
-        if (messageTemp.indexOf("AUTORESET") >= 0)
-        {
-            if (messageTemp.indexOf("ON") >= 0)
-            {
-                Serial.println("Turning AUTORESET ON");
-                RX5808::autoReset = true;
-                System::sendStat("", "AUTORESET ON");
-            }
-            else if (messageTemp.indexOf("OFF") >= 0)
-            {
-                Serial.println("Turning AUTORESET OFF");
-                RX5808::autoReset = false;
-                System::sendStat("", "AUTORESET OFF");
-            }
-        }
-        else if (messageTemp.indexOf("RESET") >= 0)
-        {
-            for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
-            
-        }
-        else if (messageTemp.indexOf("SET") >= 0)
-        {
-            int channelStart = messageTemp.indexOf("[");
-            int valueStart = messageTemp.indexOf("<");
-            int valueEnd = messageTemp.indexOf(">");
-
-            if (channelStart > 0 && valueStart > 0 && valueEnd > 0)
-            {
-                int channel = messageTemp.substring(channelStart + 1, channelStart + 2).toInt();
-                int value = messageTemp.substring(valueStart + 1, valueEnd).toInt();
-                if (channel >= 0 && value >= 0)
-                {
-                    RX5808::maxRssi[channel] = value;
-                    System::sendStat("", "Set");
-                }
-                else
-                {
-                    System::sendStat("", "Invalid value");
-                }
-            }
-            else
-            {
-                System::sendStat("","Invalid format");
-            }
-        }
-        printMaxRssi();
+        if(messageTemp.toInt() > 0) mode = messageTemp.toInt();
+        System::sendStat("mode", (String) mode);
     }
-    else if (messageTemp.indexOf("EEPROM") >= 0)
+    else if(topicTemp.indexOf("brightness") >= 0)
     {
-        if (messageTemp.indexOf("RESET") >= 0)
-        {
-            initCustomEEPROM();
-        }
-        else if (messageTemp.indexOf("SET") >= 0)
-        {
-            if (messageTemp.indexOf("NAME") >= 0)
-            {
-                int nameStart = messageTemp.indexOf("<");
-                int nameSop = messageTemp.indexOf(">");
-                if (nameStart > 0 && nameSop > 0) 
-                {
-                    String name = messageTemp.substring(nameStart + 1, nameSop);
-                    if (name.length() > 0)
-                    {
-                        persistentData.espid = name;
-                        saveEEPROM(persistentData);
-                        System::sendStat("", "Set");
-                        esp_restart();
-                    }
-                    else
-                    {
-                        System::sendStat("", "Invalid value");
-                    }
-                }
-                else
-                {
-                    System::sendStat("","Invalid format");
-                }
-            }
-            if (messageTemp.indexOf("NETWORK") >= 0)
-            {
-                int networkStart = messageTemp.indexOf("[");
-                int valueStart = messageTemp.indexOf("<");
-                int valueEnd = messageTemp.indexOf(">");
-
-                if (networkStart > 0 && valueStart > 0 && valueEnd > 0)
-                {
-                    int network = messageTemp.substring(networkStart + 1, networkStart + 2).toInt();
-
-                    int seperator1 = messageTemp.indexOf(":");
-                    int seperator2 = messageTemp.indexOf(":", seperator1+1);
-
-                    String ssid = messageTemp.substring(valueStart + 1, seperator1);
-                    String pass = messageTemp.substring(seperator1 + 1, seperator2);
-                    String mqtt = messageTemp.substring(seperator2 + 1, valueEnd);
-
-                    if (ssid.length() > 0 && pass.length() > 0 && mqtt.length() > 0)
-                    {
-                        ssid.toCharArray(persistentData.networks[network].ssid, 32);
-                        Serial.print("ssid: ");
-                        Serial.println(ssid);
-                        pass.toCharArray(persistentData.networks[network].pass, 32);
-                        Serial.print("pass: ");
-                        Serial.println(pass);
-                        mqtt.toCharArray(persistentData.networks[network].mqtt, 32);
-                        Serial.print("mqtt: ");
-                        Serial.println(mqtt);
-                        saveEEPROM(persistentData);
-                        System::sendStat("", "Set");
-                    }
-                    else
-                    {
-                        System::sendStat("", "Invalid value");
-                    }
-                }
-                else
-                {
-                    System::sendStat("","Invalid format");
-                }
-            }
-        }
+        if(messageTemp.toInt() >= 0) Animations::brightness = messageTemp.toInt();
+        System::sendStat("brightness", (String) Animations::brightness);
     }
-    else if (messageTemp.indexOf("UPDATE") >= 0)
+    else if(topicTemp.indexOf("restart") >= 0)
     {
-        checkUpdate();
-    }
-    else if (messageTemp.indexOf("RESTART") >= 0)
-    {
+        System::sendStat("restart", "OK");
         esp_restart();
     }
+    else if(topicTemp.indexOf("update") >= 0)
+    {
+        System::sendStat("update", "OK");
+        checkUpdate();
+    }
+    else if(topicTemp.indexOf("rssi_reset") >= 0)
+    {
+        for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
+        System::sendStat("rssi_reset", "OK");
+    }
+    else if(topicTemp.indexOf("rssi_autoreset") >= 0)
+    {
+        if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
+        {
+            RX5808::autoReset = false;
+        }
+        else if (messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
+        {
+            RX5808::autoReset = true;
+        }
+        else if (messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
+        {
+            RX5808::autoReset = !RX5808::autoReset;
+        }
+        System::sendStat("rssi_autoreset", (String) RX5808::autoReset);
+    }
+    else if(topicTemp.indexOf("maxrssi") >= 0)
+    {
+        // ToDo
+    }
+    else if(topicTemp.indexOf("name") >= 0)
+    {
+        String name = messageTemp;
+        if (name.length() > 0)
+        {
+            persistentData.espid = name;
+            saveEEPROM(persistentData);
+            System::sendStat("name", (String) persistentData.espid);
+            esp_restart();
+        }
+        else
+        {
+            System::sendStat("name", "Invalid value");
+        }
+    }
+    else if(topicTemp.indexOf("network") >= 0)
+    {
+        uint8_t networkStart = topicTemp.indexOf("network");
+        uint8_t network = topicTemp.substring(networkStart + 7, networkStart + 8).toInt();
+
+        uint8_t seperator1 = messageTemp.indexOf(";");
+        uint8_t seperator2 = messageTemp.indexOf(";", seperator1 + 1);
+
+        String ssid = messageTemp.substring(0, seperator1);
+        String pass = messageTemp.substring(seperator1 + 1, seperator2);
+        String mqtt = messageTemp.substring(seperator2 + 1, messageTemp.length());
+
+        if (ssid.length() > 0 && pass.length() > 0 && mqtt.length() > 0)
+        {
+            ssid.toCharArray(persistentData.networks[network].ssid, 32);
+            Serial.print("ssid: ");
+            Serial.println(ssid);
+            pass.toCharArray(persistentData.networks[network].pass, 32);
+            Serial.print("pass: ");
+            Serial.println(pass);
+            mqtt.toCharArray(persistentData.networks[network].mqtt, 32);
+            Serial.print("mqtt: ");
+            Serial.println(mqtt);
+            saveEEPROM(persistentData);
+
+            System::sendStat("network", "OK");
+        }
+        else
+        {
+            System::sendStat("network", "Invalid value");
+        }
+    }
+    
     // ToDo: make AutoUpdate optional
 }
 
@@ -316,92 +258,111 @@ void Task1code(void *pvParameters)
     {        
         System::loop();
         ArduinoOTA.handle();
-        //Animations::loop();
+        Animations::loop();
 
         /*
             ToDo: create loop tasks for librarys
-                System::loop();
                 Animations::loop();
             and put here
         */
 
         int nearest = RX5808::getNearestDrone();
-        // WhoopMode
-        if (mode == 2)
+        
+        if (power)
         {
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-        }
-        else if (nearest != 0)
-        {
-            Animations::setChannelColor(nearest);
-        }
-        else if (mode == 3)
-        {
-            Animations::standby();
-        }
-        // PartyMode
-        else if (mode == 10)
-        {
-            Animations::party();
-        }
-        // rainbow
-        else if (mode == 11)
-        {
-            Animations::rainbow();
-        }
-        // rainbowWithGlitter
-        else if (mode == 12)
-        {
-            Animations::rainbowWithGlitter();
-        }
-        // confetti
-        else if (mode == 13)
-        {
-            Animations::confetti();
-        }
-        // sinelon
-        else if (mode == 14)
-        {
-            Animations::sinelon();
-        }
-        // juggle
-        else if (mode == 15)
-        {
-            Animations::juggle();
-        }
-        // bpm
-        else if (mode == 16)
-        {
-            Animations::bpm();
-        }
-        // bpm new
-        else if (mode == 17)
-        {
-            Animations::animation = &Animations::bpm;
-        }
+            if (!powerFlag)
+            {
+                Animations::on();
+                powerFlag = 1;
+            }
+            
+            if (mode == 2)
+            {
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+            }
+            else if (nearest != 0)
+            {
+                Animations::setChannelColor(nearest);
+                //System::sendTele("saw [" + (String)nearest + "] maxrssi = " + (String)RX5808::maxRssi[nearest]);
+            }
+            // WhoopMode
+            else if (mode == 3)
+            {
+                Animations::standby();
+            }
+            // PartyMode
+            else if (mode == 10)
+            {
+                Animations::party();
+            }
+            // rainbow
+            else if (mode == 11)
+            {
+                Animations::rainbow();
+            }
+            // rainbowWithGlitter
+            else if (mode == 12)
+            {
+                Animations::rainbowWithGlitter();
+            }
+            // confetti
+            else if (mode == 13)
+            {
+                Animations::confetti();
+            }
+            // sinelon
+            else if (mode == 14)
+            {
+                Animations::sinelon();
+            }
+            // juggle
+            else if (mode == 15)
+            {
+                Animations::juggle();
+            }
+            // bpm
+            else if (mode == 16)
+            {
+                Animations::bpm();
+            }
+            // bpm new
+            else if (mode == 17)
+            {
+                Animations::animation = &Animations::bpm;
+            }
 
-        // Debug StartupAnimation
-        else if (mode == 95)
-        {
-            Animations::startup();
-        }
-        // Debug UpdateAnimation
-        else if (mode == 96)
-        {
-            Animations::update();
-        }
-        // Debug EepromAnimation
-        else if (mode == 97)
-        {
-            Animations::initEEPROM();
-        }
-        // Debug StandbyAnimation
-        else if (mode == 98)
-        {
-            Animations::standby();
+            // Debug StartupAnimation
+            else if (mode == 95)
+            {
+                Animations::startup();
+            }
+            // Debug UpdateAnimation
+            else if (mode == 96)
+            {
+                Animations::update();
+            }
+            // Debug EepromAnimation
+            else if (mode == 97)
+            {
+                Animations::initEEPROM();
+            }
+            // Debug StandbyAnimation
+            else if (mode == 98)
+            {
+                Animations::standby();
+            }
+            else
+            {
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+            }
         }
         else
         {
+            if (powerFlag)
+            {
+                Animations::off();
+                powerFlag = 0;
+            }
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     }
@@ -416,7 +377,8 @@ void loop()
     {
         checkUpdate();
         Animations::startup(); // caution: BLOCKING!!
-        mode = 2;
+        power = 0;
+        mode = 3;
     }
     // SleepMode?
     else
@@ -427,6 +389,7 @@ void loop()
             and put here
         */
         RX5808::checkRssi();      // caution: BLOCKING!!
+        System::sendRssi("0: " + (String)RX5808::rssi[0] + " 1: " + (String)RX5808::rssi[1] + " 2: " + (String)RX5808::rssi[2] + " 3: " + (String)RX5808::rssi[3] + " 4: " + (String)RX5808::rssi[4] + " 5: " + (String)RX5808::rssi[5] + " 6: " + (String)RX5808::rssi[6] + " 7: " + (String)RX5808::rssi[7]);
         RX5808::checkDroneNear(); // caution: BLOCKING!!
     }
 }
@@ -445,8 +408,11 @@ void checkUpdate()
     {
         //update available
         mode = 2;
+        power = 1;
         Animations::update();
         System::do_firmware_upgrade(url, digicert_pem_start);
+        power = 0;
+        mode = 3;
     }
     else
     {
@@ -532,7 +498,12 @@ void printEEPROM(PersistentData eData)
 // put in extra file
 void initCustomEEPROM()
 {
+    //update available
+    mode = 2;
+    power = 1;
     Animations::circle(CRGB::Blue);
+    power = 0;
+    mode = 3;
     // Put your WiFi Settings here:
     PersistentData writeData = {
         "NONAME", // MQTT Topic

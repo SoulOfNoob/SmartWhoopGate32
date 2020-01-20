@@ -41,10 +41,10 @@ void Animations::loop()
 {
     EVERY_N_MILLISECONDS(20) { gHue++; }
 
-    Animations::animation();
+    // Animations::animation();
 
-    FastLED.setBrightness(brightness);
-    FastLED.show();
+    // FastLED.setBrightness(brightness);
+    // FastLED.show();
 }
 
 void Animations::on()
@@ -92,7 +92,7 @@ void Animations::setChannelColor(uint8_t channel)
             FastLED.show();
 
             loopvar++;
-            if (loopvar >= NUM_LEDS) loopvar = 0;
+            if (loopvar >= NUM_LEDS / 2 + 1 ) loopvar = 0;
         }
     }
 }
