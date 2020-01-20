@@ -85,14 +85,14 @@ void Animations::setChannelColor(uint8_t channel)
 {
     if (loopvar < NUM_LEDS)
     {
-        EVERY_N_MILLISECONDS(2)
+        EVERY_N_MILLISECONDS(4)
         {
             _leds[loopvar] = channelColors[channel];
             _leds[NUM_LEDS - loopvar] = channelColors[channel];
             FastLED.show();
 
             loopvar++;
-            if (loopvar >= (NUM_LEDS / 2)) loopvar = 0;
+            if (loopvar >= NUM_LEDS) loopvar = 0;
         }
     }
 }

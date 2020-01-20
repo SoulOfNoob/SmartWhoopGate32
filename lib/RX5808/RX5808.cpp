@@ -288,7 +288,8 @@ void RX5808::checkDroneNear()
 {
     for (int i = 0; i < 8; i++)
     {
-        if (rssi[i] > (maxRssi[i] - 80))
+        // if measured rssi is larger then maximal measured rssi - tolerance
+        if (rssi[i] > (maxRssi[i] - 160))
         {
             droneNear[i] = true;
             RX5808::droneNearTime[i] = millis();
