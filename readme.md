@@ -48,9 +48,10 @@ gates/all/cmnd/%command%
 | brightness     | `0..255` = set LED brightness                      |
 | restart        | send empty message to trigger restart              |
 | update         | send empty message to trigger update               |
-| rssi_reset     | send empty message to trigger rssi reset           |
-| rssi_autoreset | `0` / `off` = turn OFF <br/> `1` / `on` = turn ON  |
-| maxrssi&lt;x>  | `0..4000` <br/> x = `0..7`                         |
+| resetRSSI      | send empty message to trigger rssi reset           |
+| autoresetRSSI  | `0` / `off` = turn OFF <br/> `1` / `on` = turn ON  |
+| maxRSSI&lt;x>  | `0..4000` <br/> x = `0..7`                         |
+| logRSSI        | `0` / `off` = turn OFF <br/> `1` / `on` = turn ON  |
 | name           | `<name>`                                           |
 | network&lt;x>  | `<ssid>;<pass>;<mqtt>` <br/> x = `0..4`            |
 
