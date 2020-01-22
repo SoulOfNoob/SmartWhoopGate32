@@ -38,7 +38,6 @@ void RX5808::init()
     debug = false;
     ledTime = 0;
 
-    Serial.print("RX5808 Init()");
     setupSPIpins();
     maxRssi[0] = 3000;
     maxRssi[1] = 3000;
@@ -54,7 +53,6 @@ void RX5808::init()
     analogSetPinAttenuation(A0, ADC_2_5db); //11db attenuation on pin A7
 
     setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
-    Serial.println("...done");
 }
 
 void RX5808::loop()

@@ -34,6 +34,8 @@ public:
     static void init();
     static void loop();
 
+    static uint8_t logLevel;
+
     static void setup_wifi();
     static void reconnect();
     static char *checkForUpdate(const char *cert);
@@ -55,6 +57,7 @@ public:
     static PersistentData loadEEPROM();
     static void printEEPROM(PersistentData persistentData);
     static void initCustomEEPROM();
+    static void sendDebugMessage(String level, String position, String message);
 
     static PersistentData persistentData;
 

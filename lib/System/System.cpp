@@ -29,8 +29,15 @@ String System::fallbackTeleTopic;
 String System::specificTeleTopic;
 String System::specificRssiTopic;
 
+uint8_t System::logLevel;
+
     // receive buffer
     char System::rcv_buffer[200];
+
+void System::init()
+{
+    persistentData = loadEEPROM();
+}
 
 void System::loop()
 {
@@ -65,20 +72,12 @@ esp_err_t System::_http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-void System::init()
-{
-    persistentData = loadEEPROM();
-}
-
 void System::setup_wifi()
 {
     uint8_t selectedNetwork = 0;    // manual override
     while (WiFi.status() != WL_CONNECTED)
     {
-        Serial.println();
-        Serial.print("Connecting to ");
-        Serial.println(persistentData.networks[selectedNetwork].ssid);
-
+        sendDebugMessage("Info", (String)__FUNCTION__, "Connecting to " + (String)persistentData.networks[selectedNetwork].ssid);
         WiFi.begin(persistentData.networks[selectedNetwork].ssid, persistentData.networks[selectedNetwork].pass);
 
         int counter = 0;
@@ -87,40 +86,36 @@ void System::setup_wifi()
             //if (counter > 10) esp_restart(); // if it doesn't connect in 5 seconds it never will so restart
             if (counter > 10) break;
             delay(500);
-            Serial.print(".");
+            sendDebugMessage("Info", (String)__FUNCTION__, ".");
             counter++;
         }
 
         if(WiFi.status() != WL_CONNECTED)
         {
-            Serial.println("");
-            Serial.println("Unable to connect trying next Network");
+            sendDebugMessage("Info", (String)__FUNCTION__, "Unable to connect trying next Network");
             if(selectedNetwork < 3)
             {
                 selectedNetwork++;
             }
             else
             {
-                Serial.println("All Connections failed, restarting.");
+                sendDebugMessage("Info", (String)__FUNCTION__, "All Connections failed, restarting.");
                 esp_restart();
             }
         }
         else
         {
-            Serial.println("");
-            Serial.println("WiFi connected");
-            Serial.println("IP address: ");
-            Serial.println(WiFi.localIP());
-            Serial.println("MAC address: ");
-            Serial.println(WiFi.macAddress());
+            sendDebugMessage("Info", (String)__FUNCTION__, "WiFi connected");
+            sendDebugMessage("Info", (String)__FUNCTION__, "IP address: " + (String)WiFi.localIP());
+            sendDebugMessage("Info", (String)__FUNCTION__, "MAC address: " + (String)WiFi.macAddress());
+            
             fallbackId = WiFi.macAddress();
             fallbackId.replace(":", "");
 
             if (persistentData.espid.indexOf("NONAME") >= 0)
             {
                 persistentData.espid = fallbackId;
-                Serial.print("fallback Name: ");
-                Serial.println(persistentData.espid);
+                sendDebugMessage("Info", (String)__FUNCTION__, "fallback Name: " + (String)persistentData.espid);
             }
 
             espid = persistentData.espid;
@@ -177,34 +172,31 @@ void System::reconnect()
     // Loop until we're reconnected
     while (!mqttClient.connected())
     {
-        Serial.print("Attempting MQTT connection...");
+        sendDebugMessage("Info", (String)__FUNCTION__, "Attempting MQTT connection...");
         // Attempt to connect
         String clientName = espid + "_Client";
         if (mqttClient.connect(fallbackId.c_str()))
         {
-            Serial.println("connected");
+            sendDebugMessage("Info", (String)__FUNCTION__, "connected");
             // Subscribe
             mqttClient.subscribe(genericCmndTopic.c_str());
-            Serial.println(("Subscribed: " + genericCmndTopic).c_str());
+            sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + genericCmndTopic);
             mqttClient.subscribe(fallbackCmndTopic.c_str());
-            Serial.println(("Subscribed: " + fallbackCmndTopic).c_str());
+            sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + fallbackCmndTopic);
             mqttClient.subscribe(specificCmndTopic.c_str());
-            Serial.println(("Subscribed: " + specificCmndTopic).c_str());
-
+            sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + specificCmndTopic);
             mqttClient.subscribe(genericBacklogTopic.c_str());
-            Serial.println(("Subscribed: " + genericBacklogTopic).c_str());
+            sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + genericBacklogTopic);
             mqttClient.subscribe(fallbackBacklogTopic.c_str());
-            Serial.println(("Subscribed: " + fallbackBacklogTopic).c_str());
+            sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + fallbackBacklogTopic);
             mqttClient.subscribe(specificBacklogTopic.c_str());
-            Serial.println(("Subscribed: " + specificBacklogTopic).c_str());
+            sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + specificBacklogTopic);
 
             sendTele("Ready to Receive");
         }
         else
         {
-            Serial.print("failed, rc=");
-            Serial.print(mqttClient.state());
-            Serial.println(" try again in 5 seconds");
+            sendDebugMessage("Error", (String)__FUNCTION__, "failed, rc=" + (String)mqttClient.state() + " try again in 5 seconds");
             // Wait 5 seconds before retrying
             delay(5000);
         }
@@ -217,7 +209,7 @@ char *System::checkForUpdate(const char *cert)
 {
     //UPDATE_JSON_URL
     char *downloadUrl = "";
-    printf("Looking for a new firmware...\n");
+    sendDebugMessage("Info", (String)__FUNCTION__, "Looking for a new firmware...");
 
     // configure the esp_http_client
     esp_http_client_config_t config = {};
@@ -233,7 +225,7 @@ char *System::checkForUpdate(const char *cert)
         // parse the json file
         cJSON *json = cJSON_Parse(rcv_buffer);
         if (json == NULL){
-            printf("downloaded file is not a valid json, aborting...\n");
+            sendDebugMessage("Error", (String)__FUNCTION__, "downloaded file is not a valid json, aborting...");
             sendTele("downloaded file is not a valid json, aborting...");
         }
         else
@@ -244,7 +236,7 @@ char *System::checkForUpdate(const char *cert)
             // check the version
             if (!cJSON_IsNumber(version))
             {
-                printf("unable to read new version, aborting...\n");
+                sendDebugMessage("Error", (String)__FUNCTION__, "unable to read new version, aborting...");
                 sendTele("unable to read new version, aborting...");
             }
             else
@@ -259,36 +251,35 @@ char *System::checkForUpdate(const char *cert)
                 if(new_version > FIRMWARE_VERSION) message += ". upgrading...";
                 if(new_version <= FIRMWARE_VERSION) message += ". nothing to do...";
                 sendTele(message);
+                sendDebugMessage("Info", (String)__FUNCTION__, message);
                 if (new_version > FIRMWARE_VERSION)
                 {
-                    printf("current firmware version (%.1f) is lower than the available one (%.1f), upgrading...", FIRMWARE_VERSION, new_version);
                     if (cJSON_IsString(file) && (file->valuestring != NULL))
                     {
                         //System::do_firmware_upgrade(file->valuestring, cert);
                         downloadUrl = file->valuestring;
                     }
                     else
-                        printf("unable to read the new file name, aborting...\n");
+                    {
+                        sendDebugMessage("Error", (String)__FUNCTION__, "unable to read the new file name, aborting...");
+                    }
                 }
-                else
-                    printf("current firmware version (%.1f) is greater or equal to the available one (%.1f), nothing to do...\n", FIRMWARE_VERSION, new_version);
             }
         }
     }
     else
-        printf("unable to download the json file, aborting...\n");
+        sendDebugMessage("Error", (String)__FUNCTION__, "unable to download the json file, aborting...");
 
     // cleanup
     esp_http_client_cleanup(client);
 
-    printf("\n");
     //vTaskDelay(30000 / portTICK_PERIOD_MS);
     return downloadUrl;
 }
 
 esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
 {
-    Serial.println("downloading and installing new firmware ...");
+    sendDebugMessage("Info", (String)__FUNCTION__, "downloading and installing new firmware ...");
     sendTele("Starting Update");
 
     esp_http_client_config_t config = {};
@@ -299,14 +290,14 @@ esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
 
     if (ret == ESP_OK)
     {
-        Serial.println("OTA OK, restarting...");
+        sendDebugMessage("Info", (String)__FUNCTION__, "OTA OK, restarting...");
         sendTele("Update Done");
         delay(1000);
         esp_restart();
     }
     else
     {
-        Serial.println("OTA failed...");
+        sendDebugMessage("Error", (String)__FUNCTION__, "OTA failed, aborting...");
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -314,9 +305,7 @@ esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
 
 void System::saveEEPROM(PersistentData eData)
 {
-    Serial.print("Writing ");
-    Serial.print(sizeof(eData));
-    Serial.println(" Bytes to EEPROM.");
+    sendDebugMessage("DebugLow", (String)__FUNCTION__, "Writing " + (String)sizeof(eData) + " Bytes to EEPROM.");
     char ok[2 + 1] = "OK";
     EEPROM.begin(EEPROM_SIZE);
     EEPROM.put(0, eData);
@@ -333,41 +322,12 @@ PersistentData System::loadEEPROM()
     EEPROM.get(0, eData);
     EEPROM.get(0 + sizeof(eData), ok);
     EEPROM.end();
-    Serial.println(eData.espid);
     if (String(ok) != String("OK"))
     {
-        Serial.println("No OK!");
+        sendDebugMessage("Warning", (String)__FUNCTION__, "No EEPROM data found, initializing.");
         initCustomEEPROM();
     }
     return eData;
-}
-
-void System::printEEPROM(PersistentData eData)
-{
-    Serial.println("EEPROM Data:");
-    Serial.print("espid: ");
-    Serial.println(eData.espid);
-
-    Serial.print("ssid1: ");
-    Serial.println(eData.networks[0].ssid);
-    Serial.print("pass1: ");
-    Serial.println(eData.networks[0].pass);
-    Serial.print("mqtt1: ");
-    Serial.println(eData.networks[0].mqtt);
-
-    Serial.print("ssid2: ");
-    Serial.println(eData.networks[1].ssid);
-    Serial.print("pass2: ");
-    Serial.println(eData.networks[1].pass);
-    Serial.print("mqtt2: ");
-    Serial.println(eData.networks[1].mqtt);
-
-    Serial.print("ssid3: ");
-    Serial.println(eData.networks[2].ssid);
-    Serial.print("pass3: ");
-    Serial.println(eData.networks[2].pass);
-    Serial.print("mqtt3: ");
-    Serial.println(eData.networks[2].mqtt);
 }
 
 // Default config
@@ -385,4 +345,56 @@ void System::initCustomEEPROM()
             {"SSID", "PASS", "MQTT"}  // WiFi 4
         }};
     saveEEPROM(writeData);
+}
+
+void System::sendDebugMessage(String level, String position, String message)
+{
+    uint8_t iLevel = 0;
+    if(level ==      "DebugHigh")
+    {
+        iLevel = 10;
+    }
+    else if(level == "DebugLow")
+    {
+        iLevel = 20;
+    }
+    else if(level == "Info")
+    {
+        iLevel = 30;
+    }
+    else if(level == "Warning")
+    {
+        iLevel = 40;
+    }
+    else if(level == "Error")
+    {
+        iLevel = 50;
+    }
+    else
+    {
+        iLevel = 200;
+    }
+    if(iLevel >= logLevel)
+    {
+        String tmpMessage = "[" + level + "]";
+        
+        for(uint8_t i = 0; i < 9 - level.length(); i++)
+        {
+            tmpMessage += " ";
+        }
+
+        if(logLevel <= 10 || level == "DebugHigh" || level == "Error")
+        {
+            tmpMessage += "[" + position + "]";
+            if(position.length() < 22) 
+            {
+                for(int8_t i = 0; i < 22 - position.length(); i++)
+                {
+                    tmpMessage += " ";
+                }
+            }
+        }
+        tmpMessage += " " + message + "";
+        Serial.println(tmpMessage.c_str());
+    }
 }

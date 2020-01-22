@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Backlog functionality (MQTT and Serial)
 - New Command interpretation
 - Conditional debug function
+- Debug Level
 
 ### Changed
 

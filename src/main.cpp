@@ -34,11 +34,20 @@ String commands[] = {
 };
 uint8_t commandsLength = sizeof(commands)/sizeof(commands[0]);
 
+/*
+    0 = all
+    10 = DebugHigh, DebugLow, Info, Warning, Error
+    20 = DebugLow, Info, Warning, Error
+    30 = Info, Warning, Error
+    40 = Warning, Error
+    50 = Error
+    200 = none
+*/
+
 // Switches
 bool power = 0;
 bool autoUpdate = 1;
 bool logRSSI = 0;
-bool debug = 1;
 
 // Flags
 bool bootFlag = 1;
@@ -57,23 +66,21 @@ void logMaxRssi();
 uint8_t getBoolFromString(String input);
 String getParameterFromString(String input, String parameter);
 String getCommandTopic(String topic);
-void sendDebugMessage(String position, String message);
 
 // Functions
 void setup()
 {
+    System::logLevel = 20;
     Serial.begin(115200);
-    Serial.println("\n\n\n");
+    Serial.print("\n\n\n");
     for (uint8_t t = 3; t > 0; t--)
     {
-        Serial.printf("[SETUP] WAIT %d...\n", t);
+        System::sendDebugMessage("Info", (String)__FUNCTION__, "WAIT " + (String)t + "...");
         Serial.flush();
         delay(1000);
     }
-    Serial.print("setup() running on core ");
-    Serial.println(xPortGetCoreID());
-    Serial.print("Firmware Version: ");
-    Serial.println(FIRMWARE_VERSION);
+    System::sendDebugMessage("DebugLow", (String)__FUNCTION__, "running on core " + (String)xPortGetCoreID());
+    System::sendDebugMessage("Info", (String)__FUNCTION__, "Firmware Version: " + (String)FIRMWARE_VERSION);
 
     Animations::init();
     if (FIRMWARE_VERSION == 0.0) System::initCustomEEPROM();
@@ -100,8 +107,8 @@ void setup()
 
 void handleCommand(String command, String message)
 {
-    sendDebugMessage((String)__FUNCTION__, "Started");
-    sendDebugMessage((String)__FUNCTION__, "command: " + command + " value: " + message);
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
+    System::sendDebugMessage("DebugLow", (String)__FUNCTION__, "command: " + command + " value: " + message);
     for (uint8_t i = 0; i < commandsLength; i++)
     {
         if(commands[i] == command)
@@ -129,13 +136,14 @@ void handleCommand(String command, String message)
                 sValue = (String)curValue;        
             }
             // Int
-            else if (command == "mode" || command == "brightness")
+            else if (command == "mode" || command == "brightness" || command == "logLevel")
             {
                 uint8_t dstValue = message.toInt();
                 if(dstValue >= 0)
                 {
                     if(command == "mode") mode = dstValue;
                     else if(command == "brightness") Animations::brightness = dstValue;
+                    else if(command == "logLevel") System::logLevel = dstValue;
                 }
 
                 sValue = (String)dstValue;
@@ -181,7 +189,7 @@ void handleCommand(String command, String message)
             if(sValue.length() > 0) System::sendStat(command, sValue);
         }
     }
-    sendDebugMessage((String)__FUNCTION__, "Done");
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
 }
 
 void handleSerial()
@@ -189,45 +197,48 @@ void handleSerial()
     
     if (Serial.available() > 0)
     {
-        sendDebugMessage((String)__FUNCTION__, "Started");
-        Serial.println("Message received, processing.");
+        System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
+        System::sendDebugMessage("Info", (String)__FUNCTION__, "Message received, processing.");
+
         String input = Serial.readString();
-        Serial.println(("Message is: '" + input + "'").c_str());
+        System::sendDebugMessage("Info", (String)__FUNCTION__, "Message is: '" + input + "'");
 
         handleBacklog(input);
-        sendDebugMessage((String)__FUNCTION__, "Done");
+        System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
     }
     
 }
 
 void handleBacklog(String input)
 {
-    sendDebugMessage((String)__FUNCTION__, "Started");
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "commandsLength: " + (String)commandsLength);
     for (uint8_t i = 0; i < commandsLength; i++)
     {
+        System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "i: " + (String)i);
         String parameter = commands[i];
+        System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "parameter: " + (String)parameter);
         String value = getParameterFromString(input, parameter);
+        System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "value: " + (String)value);
         if (value != "N/A")
         {
             handleCommand(parameter, value);
         }
     }
-    sendDebugMessage((String)__FUNCTION__, "Done");
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
 }
 
 void handleMQTT(char *cTopic, byte *bMessage, unsigned int length)
 {
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
     // ToDo: save all settings in Struct and consider EEPROM
-    Serial.print(("Message arrived on topic: " + (String)cTopic + ". Message: ").c_str());
     String sMessage;
     String sTopic = (String)cTopic;
     for (int i = 0; i < length; i++)
     {
-        Serial.print((char)bMessage[i]);
         sMessage += (char)bMessage[i];
     }
-    Serial.println();
-
+    System::sendDebugMessage("Info", (String)__FUNCTION__, "Message arrived on topic: " + sTopic + ". Message: " + sMessage);
     if (sTopic.indexOf("backlog") >= 0) {
         handleBacklog(sMessage);
     }
@@ -235,13 +246,13 @@ void handleMQTT(char *cTopic, byte *bMessage, unsigned int length)
     {
         handleCommand(getCommandTopic((String)cTopic), sMessage);
     }
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
 }
 
 //Task1code: blinks an LED every 1000 ms
 void Task1code(void *pvParameters)
 {
-    Serial.print("Task1 running on core ");
-    Serial.println(xPortGetCoreID());
+    System::sendDebugMessage("Info", (String)__FUNCTION__, "Task1 running on core " + (String)xPortGetCoreID());
 
     for (;;)
     {        
@@ -323,6 +334,7 @@ void loop()
 // ToDo: put inside system and call Animations::changeAnimation();
 void checkUpdate()
 {
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
     System::sendTele("uptime: " + (String)millis() + " ms, FW: " + (String)FIRMWARE_VERSION + ". Checking for updates..");
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
@@ -338,8 +350,9 @@ void checkUpdate()
     else
     {
         // no update
-        Serial.println("No File");
+        System::sendDebugMessage("Warning", (String)__FUNCTION__, "No File");
     }
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
 }
 
 void logRssi()
@@ -372,6 +385,7 @@ void logMaxRssi()
 
 uint8_t getBoolFromString(String input)
 {
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
     if (input.indexOf("0") >= 0 || input.indexOf("OFF") >= 0 || input.indexOf("off") >= 0)
     {
         return 0;
@@ -384,17 +398,14 @@ uint8_t getBoolFromString(String input)
     {
         return 2;
     }
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
 }
 
 String getParameterFromString(String input, String parameter)
 {
-    sendDebugMessage((String)__FUNCTION__, "Started");
-    // input = "power: 1; mode: 15; brightness: 150; autoUpdate: OFF; logRSSI = on";
-    // parameter = "restart";
+    System::sendDebugMessage("DebugHigh", "getParameterFromString", "Started");
     String value = "N/A";
-
     int8_t parameterIndex = input.indexOf(parameter);
-    //Serial.println(("Parameter: " + parameter + " position is: " + parameterIndex).c_str());
     if (parameterIndex >= 0)
     {
         int8_t beginIndex = input.indexOf(":", parameterIndex);
@@ -404,13 +415,14 @@ String getParameterFromString(String input, String parameter)
             value = input.substring(beginIndex + 2, endIndex);
         }
     }
-    sendDebugMessage((String)__FUNCTION__, "Parameter '" + parameter + "' is: '" + value + "'");
-    sendDebugMessage((String)__FUNCTION__, "Done");
+    System::sendDebugMessage("DebugHigh", "getParameterFromString", "Parameter '" + parameter + "' is: '" + value + "'");
+    System::sendDebugMessage("DebugHigh", "getParameterFromString", "Done");
     return value;
 }
 
 String getCommandTopic(String topic)
 {
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Started");
     String command = "N/A";
 
     uint8_t parameterIndex = topic.indexOf("cmnd/");
@@ -422,14 +434,6 @@ String getCommandTopic(String topic)
             command = topic.substring(beginIndex + 1);
         }
     }
-
+    System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
     return command;
-}
-
-void sendDebugMessage(String position, String message)
-{
-    if(debug)
-    {
-        Serial.println(("[" + position + "] " + message).c_str());
-    }
 }
