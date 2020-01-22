@@ -16,7 +16,7 @@ const CRGB Animations::channelColors[8] = {
     CRGB::Magenta
 };
 
-CRGB *Animations::_leds;
+CRGB Animations::leds[NUM_LEDS];
 
 unsigned int Animations::ledTime = 0;
 uint8_t Animations::defaultBrightness = 200;
@@ -31,9 +31,9 @@ uint8_t pulseBrightness = 0;
 uint8_t pos = 0;
 uint8_t loopvar = 0;
 
-void Animations::init(CRGB *leds)
+void Animations::init()
 {
-    _leds = leds;
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     Animations::animation = &Animations::rainbow;
 }
 
@@ -71,14 +71,14 @@ void Animations::standby()
     //     FastLED.clear();
     //     for (int led = offset; led < NUM_LEDS; led += 2)
     //     {
-    //         _leds[led] = CRGB::White;
+    //         leds[led] = CRGB::White;
     //     }
     //     FastLED.setBrightness(brightness);
     //     FastLED.show();
     //     offset = !offset;
     // }
     //Animations::pulseCircleRGB(leds);
-    Animations::wingRotationRGB();
+    
 }
 
 void Animations::setChannelColor(uint8_t channel)
@@ -87,8 +87,8 @@ void Animations::setChannelColor(uint8_t channel)
     {
         EVERY_N_MILLISECONDS(4)
         {
-            _leds[loopvar] = channelColors[channel];
-            _leds[NUM_LEDS - loopvar] = channelColors[channel];
+            leds[loopvar] = channelColors[channel];
+            leds[NUM_LEDS - loopvar] = channelColors[channel];
             FastLED.show();
 
             loopvar++;
@@ -100,13 +100,13 @@ void Animations::setChannelColor(uint8_t channel)
 void Animations::startup()
 {
     Serial.print("Boot Animation");
-    Animations::circle(CRGB::Green);
+    circle(CRGB::Green);
     Serial.println(" Done");
 }
 void Animations::update()
 {
     Serial.print("EEPROM Animation");
-    Animations::circle(CRGB::Red);
+    circle(CRGB::Red);
     Serial.println(" Done");
 }
 void Animations::initEEPROM()
@@ -125,14 +125,14 @@ void Animations::circle(CRGB color)
     for (int led = 0; led < NUM_LEDS; led++)
     {
         Serial.print(".");
-        _leds[led] = color;
+        leds[led] = color;
         FastLED.show();
         delay(speed);
     }
     for (int led = 0; led < NUM_LEDS; led++)
     {
         Serial.print(".");
-        _leds[led] = CRGB::Black;
+        leds[led] = CRGB::Black;
         FastLED.show();
         delay(speed);
     }
@@ -169,7 +169,7 @@ void Animations::pulseCircleRGB()
         CRGBPalette16 palette = PartyColors_p;
         for (int i = 0; i < NUM_LEDS; i++)
         { //9948
-            _leds[i] = ColorFromPalette(palette, gHue + (i * 2), pulseBrightness - gHue + (i * 10));
+            leds[i] = ColorFromPalette(palette, gHue + (i * 2), pulseBrightness - gHue + (i * 10));
         }
         FastLED.show();
     }
@@ -177,18 +177,18 @@ void Animations::pulseCircleRGB()
 
 void Animations::wingRotationRGB()
 {                                        // color speed
-    EVERY_N_MILLISECONDS(1000 / 20) { pos = Animations::doOverflow(pos + 1, 0, NUM_LEDS); } // rotation speed
+    EVERY_N_MILLISECONDS(1000 / 20) { pos = doOverflow(pos + 1, 0, NUM_LEDS); } // rotation speed
     EVERY_N_MILLISECONDS(1000 / 60)
     { // render speed
         // a colored dot sweeping back and forth, with fading trails
-        fadeToBlackBy(_leds, NUM_LEDS, 5);
+        fadeToBlackBy(leds, NUM_LEDS, 5);
         for (size_t i = 0; i < 3; i++)
         {
-            uint8_t tmpPos = Animations::doOverflow(pos + (i * 30), 0, NUM_LEDS);
-            _leds[tmpPos] = CHSV(Animations::doOverflow(gHue + (i * (85)), 0, 255), 255, 192);
+            uint8_t tmpPos = doOverflow(pos + (i * 30), 0, NUM_LEDS);
+            leds[tmpPos] = CHSV(doOverflow(gHue + (i * (85)), 0, 255), 255, 192);
         }
 
-        //_leds[pos] += CHSV(gHue, 255, 192);
+        //leds[pos] += CHSV(gHue, 255, 192);
         FastLED.show();
     }
 }
@@ -196,22 +196,22 @@ void Animations::wingRotationRGB()
 void Animations::rainbow()
 {
     // FastLED's built-in rainbow generator
-    fill_rainbow(_leds, NUM_LEDS, gHue, 7);
+    fill_rainbow(leds, NUM_LEDS, gHue, 7);
     FastLED.show();
 }
 
 void Animations::rainbowWithGlitter()
 {
     // built-in FastLED rainbow, plus some random sparkly glitter
-    Animations::rainbow();
-    Animations::addGlitter(80);
+    rainbow();
+    addGlitter(80);
 }
 
 void Animations::addGlitter(fract8 chanceOfGlitter)
 {
     if (random8() < chanceOfGlitter)
     {
-        _leds[random16(NUM_LEDS)] += CRGB::White;
+        leds[random16(NUM_LEDS)] += CRGB::White;
     }
     FastLED.show();
 }
@@ -219,18 +219,18 @@ void Animations::addGlitter(fract8 chanceOfGlitter)
 void Animations::confetti()
 {
     // random colored speckles that blink in and fade smoothly
-    fadeToBlackBy(_leds, NUM_LEDS, 10);
+    fadeToBlackBy(leds, NUM_LEDS, 10);
     int pos = random16(NUM_LEDS);
-    _leds[pos] += CHSV(gHue + random8(64), 200, 255);
+    leds[pos] += CHSV(gHue + random8(64), 200, 255);
     FastLED.show();
 }
 
 void Animations::sinelon()
 {
     // a colored dot sweeping back and forth, with fading trails
-    fadeToBlackBy(_leds, NUM_LEDS, 20);
+    fadeToBlackBy(leds, NUM_LEDS, 20);
     int pos = beatsin16(13, 0, NUM_LEDS - 1);
-    _leds[pos] += CHSV(gHue, 255, 192);
+    leds[pos] += CHSV(gHue, 255, 192);
     FastLED.show();
 }
 
@@ -243,7 +243,7 @@ void Animations::bpm()
 
     for (int i = 0; i < NUM_LEDS; i++)
     { //9948
-        _leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+        leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
     }
     FastLED.show();
 }
@@ -251,11 +251,11 @@ void Animations::bpm()
 void Animations::juggle()
 {
     // eight colored dots, weaving in and out of sync with each other
-    fadeToBlackBy(_leds, NUM_LEDS, 20);
+    fadeToBlackBy(leds, NUM_LEDS, 20);
     byte dothue = 0;
     for (int i = 0; i < 8; i++)
     {
-        _leds[beatsin16(i + 7, 0, NUM_LEDS - 1)] |= CHSV(dothue, 200, 255);
+        leds[beatsin16(i + 7, 0, NUM_LEDS - 1)] |= CHSV(dothue, 200, 255);
         dothue += 32;
     }
     FastLED.show();

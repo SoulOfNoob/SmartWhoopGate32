@@ -8,7 +8,7 @@
 class Animations
 {
 public:
-    static void init(CRGB *leds);
+    static void init();
     static void loop();
     static void on();
     static void off();
@@ -37,7 +37,7 @@ public:
     static uint8_t brightness;
 
 private:
-    static CRGB *_leds;
+    static CRGB leds[NUM_LEDS];
 
     static const CRGB standbyColor;
     static const CRGB channelColors[8];

@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <RX5808.h>
-#include <Animations.h>
 #include <FastLED.h>
 
 #define spiDataPin 16
@@ -52,36 +51,112 @@ void RX5808::init()
 
     analogReadResolution(12); // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
     analogSetWidth(12);       // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
-    //  9-bit gives an ADC range of 0-511
-    // 10-bit gives an ADC range of 0-1023
-    // 11-bit gives an ADC range of 0-2047
-    // 12-bit gives an ADC range of 0-4095
-
-    //analogSetAttenuation(ADC_0db);  //For all pins
-    //analogSetPinAttenuation(A18, ADC_0db); //0db attenuation on pin A18
-    //analogSetPinAttenuation(A19, ADC_2_5db); //2.5db attenuation on pin A19
-    //analogSetPinAttenuation(A6, ADC_6db); //6db attenuation on pin A6
     analogSetPinAttenuation(A0, ADC_2_5db); //11db attenuation on pin A7
 
-    // for (int i = 0; i < 8; i++)
-    // {
-    //     setModuleFrequency(pgm_read_word_near(channelFreqTable + i));
-    //     analogRead(rssiPin);
-    //     rssi[i] = analogRead(rssiPin);
-    //     maxRssi[i] = 2000;
-    //     maxRssiTime[i] = 0;
-    // }
-    // for (int x = 0; x < num_leds; x++)
-    // {
-    //     if (x % 2 == 0)
-    //     {
-    //         leds[x] = CRGB::White;
-    //     }
-    // }
-    // FastLED.setBrightness(200);
-
-    RX5808::setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
+    setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
     Serial.println("...done");
+}
+
+void RX5808::loop()
+{
+    checkRssi();      // caution: BLOCKING!!
+    checkDroneNear(); // caution: BLOCKING!!
+}
+
+void RX5808::resetMaxRssi(uint8_t channel){
+    maxRssiTime[channel] = millis();
+    maxRssi[channel] = 3000;
+    droneNearTime[channel] = 0;
+}
+
+void RX5808::checkRssi()
+{
+    for (int i = 0; i < 8; i++)
+    {
+        setModuleFrequency(pgm_read_word_near(channelFreqTable + i));
+        analogRead(rssiPin);
+        rssi[i] = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
+        if (rssi[i] > maxRssi[i])
+        {
+            maxRssi[i] = rssi[i];
+        }
+        if(autoReset){
+            EVERY_N_SECONDS(10){
+                for(uint8_t i = 0; i < 8; i++)
+                {
+                    if (droneNearTime[i] != 0)
+                    {
+                        Serial.print("Calc Reset: ");
+                        Serial.print(droneNearTime[i] + 180000);
+                        Serial.print(" < ");
+                        Serial.print(millis());
+                        Serial.print(" = ");
+                        Serial.println(droneNearTime[i] + 180000 < millis());
+                        if (droneNearTime[i] + 180000 < millis()) // 3 min
+                        {
+                            Serial.print("Reset: ");
+                            Serial.print(i);
+                            resetMaxRssi(i);
+                        }
+                    }
+                    
+                }
+            }
+        }
+        if ((rssi[i] >= 2000 && debug))
+        {
+            Serial.print("Channel: ");
+            Serial.print(i);
+            Serial.print(" Rssi: ");
+            Serial.println(rssi[i]);
+        }
+    }
+}
+
+void RX5808::checkDroneNear()
+{
+    for (int i = 0; i < 8; i++)
+    {
+        // if measured rssi is larger then maximal measured rssi - tolerance
+        if (rssi[i] > (maxRssi[i] - 300))
+        {
+            droneNear[i] = true;
+            droneNearTime[i] = millis();
+            if (debug)
+            {
+                Serial.print("Channel: ");
+                Serial.print(i);
+                Serial.print(" Time: ");
+                Serial.println(droneNearTime[i]);
+            }
+        }
+        else if (droneNearTime[i] < millis() - 5000)
+        {
+            droneNear[i] = false;
+            //droneNearTime[i] = 0;
+        }
+    }
+}
+
+int RX5808::getNearestDrone()
+{
+    int newest = 0;
+    int nearestChannel = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        if (droneNear[i] & (droneNearTime[i] > newest))
+        {
+            if (debug)
+            {
+                Serial.print("Channel: ");
+                Serial.print(i);
+                Serial.println(" Dronenear! ");
+            }
+            newest = droneNearTime[i];
+            nearestChannel = i;
+        }
+    }
+    return nearestChannel;
 }
 
 void RX5808::setupSPIpins()
@@ -159,42 +234,42 @@ void RX5808::setModuleFrequency(uint16_t frequency)
     // Order: A0-3, !R/W, D0-D19
     // A0=0, A1=0, A2=0, A3=1, RW=0, D0-19=0
     cli();
-    RX5808::SERIAL_ENABLE_HIGH();
+    SERIAL_ENABLE_HIGH();
     delayMicroseconds(1);
-    RX5808::SERIAL_ENABLE_LOW();
+    SERIAL_ENABLE_LOW();
 
-    RX5808::SERIAL_SENDBIT0();
-    RX5808::SERIAL_SENDBIT0();
-    RX5808::SERIAL_SENDBIT0();
-    RX5808::SERIAL_SENDBIT1();
+    SERIAL_SENDBIT0();
+    SERIAL_SENDBIT0();
+    SERIAL_SENDBIT0();
+    SERIAL_SENDBIT1();
 
-    RX5808::SERIAL_SENDBIT0();
+    SERIAL_SENDBIT0();
 
     // remaining zeros
     for (i = 20; i > 0; i--)
     {
-        RX5808::SERIAL_SENDBIT0();
+        SERIAL_SENDBIT0();
     }
 
     // Clock the data in
-    RX5808::SERIAL_ENABLE_HIGH();
+    SERIAL_ENABLE_HIGH();
     delayMicroseconds(1);
-    RX5808::SERIAL_ENABLE_LOW();
+    SERIAL_ENABLE_LOW();
 
     // Second is the channel data from the lookup table
     // 20 bytes of register data are sent, but the MSB 4 bits are zeros
     // register address = 0x1, write, data0-15=channelData data15-19=0x0
-    RX5808::SERIAL_ENABLE_HIGH();
-    RX5808::SERIAL_ENABLE_LOW();
+    SERIAL_ENABLE_HIGH();
+    SERIAL_ENABLE_LOW();
 
     // Register 0x1
-    RX5808::SERIAL_SENDBIT1();
-    RX5808::SERIAL_SENDBIT0();
-    RX5808::SERIAL_SENDBIT0();
-    RX5808::SERIAL_SENDBIT0();
+    SERIAL_SENDBIT1();
+    SERIAL_SENDBIT0();
+    SERIAL_SENDBIT0();
+    SERIAL_SENDBIT0();
 
     // Write to register
-    RX5808::SERIAL_SENDBIT1();
+    SERIAL_SENDBIT1();
 
     // D0-D15
     //   note: loop runs backwards as more efficent on AVR
@@ -203,11 +278,11 @@ void RX5808::setModuleFrequency(uint16_t frequency)
         // Is bit high or low?
         if (channelData & 0x1)
         {
-            RX5808::SERIAL_SENDBIT1();
+            SERIAL_SENDBIT1();
         }
         else
         {
-            RX5808::SERIAL_SENDBIT0();
+            SERIAL_SENDBIT0();
         }
         // Shift bits along to check the next one
         channelData >>= 1;
@@ -216,11 +291,11 @@ void RX5808::setModuleFrequency(uint16_t frequency)
     // Remaining D16-D19
     for (i = 4; i > 0; i--)
     {
-        RX5808::SERIAL_SENDBIT0();
+        SERIAL_SENDBIT0();
     }
 
     // Finished clocking data in
-    RX5808::SERIAL_ENABLE_HIGH();
+    SERIAL_ENABLE_HIGH();
     delayMicroseconds(1);
 
     //digitalLow(slaveSelectPin);
@@ -232,100 +307,4 @@ void RX5808::setModuleFrequency(uint16_t frequency)
     sei();
 
     delay(MIN_TUNE_TIME);
-}
-
-void RX5808::resetMaxRssi(uint8_t channel){
-    maxRssiTime[channel] = millis();
-    maxRssi[channel] = 3000;
-    RX5808::droneNearTime[channel] = 0;
-}
-
-void RX5808::checkRssi()
-{
-    for (int i = 0; i < 8; i++)
-    {
-        RX5808::setModuleFrequency(pgm_read_word_near(channelFreqTable + i));
-        analogRead(rssiPin);
-        rssi[i] = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
-        if (rssi[i] > maxRssi[i])
-        {
-            maxRssi[i] = rssi[i];
-        }
-        if(autoReset){
-            EVERY_N_SECONDS(10){
-                for(uint8_t i = 0; i < 8; i++)
-                {
-                    if (RX5808::droneNearTime[i] != 0)
-                    {
-                        Serial.print("Calc Reset: ");
-                        Serial.print(RX5808::droneNearTime[i] + 180000);
-                        Serial.print(" < ");
-                        Serial.print(millis());
-                        Serial.print(" = ");
-                        Serial.println(RX5808::droneNearTime[i] + 180000 < millis());
-                        if (RX5808::droneNearTime[i] + 180000 < millis()) // 3 min
-                        {
-                            Serial.print("Reset: ");
-                            Serial.print(i);
-                            RX5808::resetMaxRssi(i);
-                        }
-                    }
-                    
-                }
-            }
-        }
-        if ((rssi[i] >= 2000 && debug))
-        {
-            Serial.print("Channel: ");
-            Serial.print(i);
-            Serial.print(" Rssi: ");
-            Serial.println(rssi[i]);
-        }
-    }
-}
-
-void RX5808::checkDroneNear()
-{
-    for (int i = 0; i < 8; i++)
-    {
-        // if measured rssi is larger then maximal measured rssi - tolerance
-        if (rssi[i] > (maxRssi[i] - 300))
-        {
-            droneNear[i] = true;
-            RX5808::droneNearTime[i] = millis();
-            if (debug)
-            {
-                Serial.print("Channel: ");
-                Serial.print(i);
-                Serial.print(" Time: ");
-                Serial.println(RX5808::droneNearTime[i]);
-            }
-        }
-        else if (RX5808::droneNearTime[i] < millis() - 5000)
-        {
-            droneNear[i] = false;
-            //RX5808::droneNearTime[i] = 0;
-        }
-    }
-}
-
-int RX5808::getNearestDrone()
-{
-    int newest = 0;
-    int nearestChannel = 0;
-    for (int i = 0; i < 8; i++)
-    {
-        if (droneNear[i] & (RX5808::droneNearTime[i] > newest))
-        {
-            if (debug)
-            {
-                Serial.print("Channel: ");
-                Serial.print(i);
-                Serial.println(" Dronenear! ");
-            }
-            newest = RX5808::droneNearTime[i];
-            nearestChannel = i;
-        }
-    }
-    return nearestChannel;
 }

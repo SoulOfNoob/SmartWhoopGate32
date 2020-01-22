@@ -6,7 +6,7 @@
 #include <esp_https_ota.h>
 #include <PubSubClient.h>
 
-PersistentData *System::_persistentData;
+PersistentData System::persistentData;
 
 WiFiClient System::wifiClient;
 PubSubClient System::mqttClient(System::wifiClient);
@@ -18,6 +18,9 @@ String System::MQTTPrefix = "gates";
 String System::genericCmndTopic;
 String System::fallbackCmndTopic;
 String System::specificCmndTopic;
+String System::genericBacklogTopic;
+String System::fallbackBacklogTopic;
+String System::specificBacklogTopic;
 String System::genericStatTopic;
 String System::fallbackStatTopic;
 String System::specificStatTopic;
@@ -62,21 +65,21 @@ esp_err_t System::_http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-void System::init(PersistentData *persistentData)
+void System::init()
 {
-    
+    persistentData = loadEEPROM();
 }
 
-void System::setup_wifi(PersistentData *persistentData)
+void System::setup_wifi()
 {
     uint8_t selectedNetwork = 0;    // manual override
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.println();
         Serial.print("Connecting to ");
-        Serial.println(persistentData->networks[selectedNetwork].ssid);
+        Serial.println(persistentData.networks[selectedNetwork].ssid);
 
-        WiFi.begin(persistentData->networks[selectedNetwork].ssid, persistentData->networks[selectedNetwork].pass);
+        WiFi.begin(persistentData.networks[selectedNetwork].ssid, persistentData.networks[selectedNetwork].pass);
 
         int counter = 0;
         while (WiFi.status() != WL_CONNECTED)
@@ -113,18 +116,22 @@ void System::setup_wifi(PersistentData *persistentData)
             fallbackId = WiFi.macAddress();
             fallbackId.replace(":", "");
 
-            if (persistentData->espid.indexOf("NONAME") >= 0)
+            if (persistentData.espid.indexOf("NONAME") >= 0)
             {
-                persistentData->espid = fallbackId;
+                persistentData.espid = fallbackId;
                 Serial.print("fallback Name: ");
-                Serial.println(persistentData->espid);
+                Serial.println(persistentData.espid);
             }
 
-            espid = persistentData->espid;
+            espid = persistentData.espid;
 
             genericCmndTopic = MQTTPrefix + "/all/cmnd/#";
             fallbackCmndTopic = MQTTPrefix + "/" + fallbackId + "/cmnd/#";
             specificCmndTopic = MQTTPrefix + "/" + espid + "/cmnd/#";
+
+            genericBacklogTopic = MQTTPrefix + "/all/backlog";
+            fallbackBacklogTopic = MQTTPrefix + "/" + fallbackId + "/backlog";
+            specificBacklogTopic = MQTTPrefix + "/" + espid + "/backlog";
 
             genericStatTopic = MQTTPrefix + "/all/stat";
             fallbackStatTopic = MQTTPrefix + "/" + fallbackId + "/stat";
@@ -142,7 +149,7 @@ void System::setup_wifi(PersistentData *persistentData)
             hostname_s.toCharArray(hostname_c, 64);
             WiFi.setHostname(hostname_c);
 
-            mqttClient.setServer(persistentData->networks[selectedNetwork].mqtt, 1883);
+            mqttClient.setServer(persistentData.networks[selectedNetwork].mqtt, 1883);
             break;
         }
     }
@@ -183,6 +190,13 @@ void System::reconnect()
             Serial.println(("Subscribed: " + fallbackCmndTopic).c_str());
             mqttClient.subscribe(specificCmndTopic.c_str());
             Serial.println(("Subscribed: " + specificCmndTopic).c_str());
+
+            mqttClient.subscribe(genericBacklogTopic.c_str());
+            Serial.println(("Subscribed: " + genericBacklogTopic).c_str());
+            mqttClient.subscribe(fallbackBacklogTopic.c_str());
+            Serial.println(("Subscribed: " + fallbackBacklogTopic).c_str());
+            mqttClient.subscribe(specificBacklogTopic.c_str());
+            Serial.println(("Subscribed: " + specificBacklogTopic).c_str());
 
             sendTele("Ready to Receive");
         }
@@ -296,4 +310,79 @@ esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+void System::saveEEPROM(PersistentData eData)
+{
+    Serial.print("Writing ");
+    Serial.print(sizeof(eData));
+    Serial.println(" Bytes to EEPROM.");
+    char ok[2 + 1] = "OK";
+    EEPROM.begin(EEPROM_SIZE);
+    EEPROM.put(0, eData);
+    EEPROM.put(0 + sizeof(eData), ok);
+    EEPROM.commit();
+    EEPROM.end();
+}
+
+PersistentData System::loadEEPROM()
+{
+    PersistentData eData;
+    char ok[2 + 1];
+    EEPROM.begin(EEPROM_SIZE);
+    EEPROM.get(0, eData);
+    EEPROM.get(0 + sizeof(eData), ok);
+    EEPROM.end();
+    Serial.println(eData.espid);
+    if (String(ok) != String("OK"))
+    {
+        Serial.println("No OK!");
+        initCustomEEPROM();
+    }
+    return eData;
+}
+
+void System::printEEPROM(PersistentData eData)
+{
+    Serial.println("EEPROM Data:");
+    Serial.print("espid: ");
+    Serial.println(eData.espid);
+
+    Serial.print("ssid1: ");
+    Serial.println(eData.networks[0].ssid);
+    Serial.print("pass1: ");
+    Serial.println(eData.networks[0].pass);
+    Serial.print("mqtt1: ");
+    Serial.println(eData.networks[0].mqtt);
+
+    Serial.print("ssid2: ");
+    Serial.println(eData.networks[1].ssid);
+    Serial.print("pass2: ");
+    Serial.println(eData.networks[1].pass);
+    Serial.print("mqtt2: ");
+    Serial.println(eData.networks[1].mqtt);
+
+    Serial.print("ssid3: ");
+    Serial.println(eData.networks[2].ssid);
+    Serial.print("pass3: ");
+    Serial.println(eData.networks[2].pass);
+    Serial.print("mqtt3: ");
+    Serial.println(eData.networks[2].mqtt);
+}
+
+// Default config
+// put in extra file
+void System::initCustomEEPROM()
+{
+    // ToDo: animation here
+    // Put your WiFi Settings here:
+    PersistentData writeData = {
+        "NONAME", // MQTT Topic
+        {
+            {"SSID", "PASS", "MQTT"}, // WiFi 1
+            {"SSID", "PASS", "MQTT"}, // WiFi 2
+            {"SSID", "PASS", "MQTT"}, // WiFi 3
+            {"SSID", "PASS", "MQTT"}  // WiFi 4
+        }};
+    saveEEPROM(writeData);
 }

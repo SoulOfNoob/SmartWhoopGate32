@@ -1,7 +1,5 @@
 // Includes
 #include <Arduino.h>
-#include <EEPROM.h>
-#include <config.h>
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include <FastLED.h>
@@ -10,8 +8,6 @@
 #include <System.h>
 
 // Macros
-#define DATA_PIN 13
-#define NUM_LEDS 90
 #define EEPROM_SIZE 512
 
 // Constants
@@ -21,26 +17,47 @@ extern const char digicert_pem_start[] asm("_binary_certs_digicert_pem_start");
 // Variables
 TaskHandle_t Task1;
 TaskHandle_t Task2;
-CRGB leds[NUM_LEDS];
 
 uint8_t mode = 0;
-bool power = 1;
-bool powerFlag = 1;
-bool logRSSI = 0;
+String commands[] = {
+    "power",
+    "mode",
+    "brightness",
+    "restart",
+    "update",
+    "autoUpdate",
+    "resetRSSI",
+    "autoresetRSSI",
+    "maxRSSI",
+    "logRSSI",
+    "name"
+};
+uint8_t commandsLength = sizeof(commands)/sizeof(commands[0]);
 
-PersistentData persistentData;
+// Switches
+bool power = 0;
+bool autoUpdate = 1;
+bool logRSSI = 0;
+bool debug = 1;
+
+// Flags
+bool bootFlag = 1;
+bool powerFlag = 1;
 
 // Declarations
 void Task1code(void *pvParameters);
 void Task2code(void *pvParameters);
-void handleCommand(char *topic, byte *message, unsigned int length);
+void handleCommand(String command, String message);
+void handleSerial();
+void handleBacklog(String input);
+void handleMQTT(char *topic, byte *message, unsigned int length);
 void checkUpdate();
-void saveEEPROM(PersistentData argument);
-PersistentData loadEEPROM();
 void logRssi();
 void logMaxRssi();
-void printEEPROM(PersistentData persistentData);
-void initCustomEEPROM();
+uint8_t getBoolFromString(String input);
+String getParameterFromString(String input, String parameter);
+String getCommandTopic(String topic);
+void sendDebugMessage(String position, String message);
 
 // Functions
 void setup()
@@ -58,18 +75,15 @@ void setup()
     Serial.print("Firmware Version: ");
     Serial.println(FIRMWARE_VERSION);
 
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-    Animations::init(leds);
-    if (FIRMWARE_VERSION == 0.0) initCustomEEPROM();
-    persistentData = loadEEPROM();
-
+    Animations::init();
+    if (FIRMWARE_VERSION == 0.0) System::initCustomEEPROM();
     // init librarys
-    System::init(&persistentData);
-    System::setup_wifi(&persistentData);
-
-    System::mqttClient.setCallback(handleCommand);
+    System::init();
+    System::setup_wifi();
     RX5808::init();
 
+    System::mqttClient.setCallback(handleMQTT);
+    
     //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
     xTaskCreatePinnedToCore(
         Task1code, /* Task function. */
@@ -81,189 +95,146 @@ void setup()
         0);        /* pin task to core 0 */
     delay(500);
 
-    ArduinoOTA
-        .onStart([]() {
-            //mode = 99;
-            //Animations::update(leds);
-            String type;
-            if (ArduinoOTA.getCommand() == U_FLASH)
-                type = "sketch";
-            else // U_SPIFFS
-                type = "filesystem";
-
-            // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-            Serial.println("Start updating " + type);
-        })
-        .onEnd([]() {
-            Serial.println("\nEnd");
-        })
-        .onProgress([](unsigned int progress, unsigned int total) {
-            Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-        })
-        .onError([](ota_error_t error) {
-            Serial.printf("Error[%u]: ", error);
-            if (error == OTA_AUTH_ERROR)
-                Serial.println("Auth Failed");
-            else if (error == OTA_BEGIN_ERROR)
-                Serial.println("Begin Failed");
-            else if (error == OTA_CONNECT_ERROR)
-                Serial.println("Connect Failed");
-            else if (error == OTA_RECEIVE_ERROR)
-                Serial.println("Receive Failed");
-            else if (error == OTA_END_ERROR)
-                Serial.println("End Failed");
-        });
-
-    ArduinoOTA.begin();
-
     mode = 1;
 }
 
-void handleCommand(char *topic, byte *message, unsigned int length)
+void handleCommand(String command, String message)
 {
-    Serial.print("Message arrived on topic: ");
-    Serial.print(topic);
-    Serial.print(". Message: ");
-    String messageTemp;
-    String topicTemp = topic;
+    sendDebugMessage((String)__FUNCTION__, "Started");
+    sendDebugMessage((String)__FUNCTION__, "command: " + command + " value: " + message);
+    for (uint8_t i = 0; i < commandsLength; i++)
+    {
+        if(commands[i] == command)
+        {
+            String sValue = "";
+            // Bool
+            if(command == "power" || command == "autoUpdate" || command == "autoReset" || command == "logRSSI")
+            {
+                uint8_t dstValue = getBoolFromString(message);
+                uint8_t curValue = 0;
 
+                if (command == "power") curValue = power;
+                else if (command == "autoUpdate") curValue = autoUpdate;
+                else if (command == "autoReset") curValue = RX5808::autoReset;
+                else if (command == "logRSSI") curValue = logRSSI;
+
+                if (dstValue == 2) curValue = !curValue;
+                else curValue = dstValue;
+
+                if (command == "power") power = curValue;
+                else if (command == "autoUpdate") autoUpdate = curValue;
+                else if (command == "autoReset") RX5808::autoReset = curValue;
+                else if (command == "logRSSI") logRSSI = curValue;
+
+                sValue = (String)curValue;        
+            }
+            // Int
+            else if (command == "mode" || command == "brightness")
+            {
+                uint8_t dstValue = message.toInt();
+                if(dstValue >= 0)
+                {
+                    if(command == "mode") mode = dstValue;
+                    else if(command == "brightness") Animations::brightness = dstValue;
+                }
+
+                sValue = (String)dstValue;
+            }
+            // String
+            else if (command == "name")
+            {
+                String name = message;
+
+                if (name.length() > 0)
+                {
+                    System::persistentData.espid = name;
+                    System::saveEEPROM(System::persistentData);
+                    System::sendStat(command, (String)System::persistentData.espid);
+                    esp_restart();
+                }
+                else
+                {
+                    System::sendStat(command, "Invalid value");
+                }
+            }
+            // Commands
+            else if (command == "restart")
+            {
+                System::sendStat(command, "OK");
+                esp_restart();
+            }
+            else if (command == "update")
+            {
+                System::sendStat(command, "OK");
+                checkUpdate();
+            }
+            else if (command == "resetRSSI")
+            {
+                for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
+                System::sendStat(command, "OK");
+            }
+            else
+            {
+                sValue = (String)false;
+            }
+            
+            if(sValue.length() > 0) System::sendStat(command, sValue);
+        }
+    }
+    sendDebugMessage((String)__FUNCTION__, "Done");
+}
+
+void handleSerial()
+{
+    
+    if (Serial.available() > 0)
+    {
+        sendDebugMessage((String)__FUNCTION__, "Started");
+        Serial.println("Message received, processing.");
+        String input = Serial.readString();
+        Serial.println(("Message is: '" + input + "'").c_str());
+
+        handleBacklog(input);
+        sendDebugMessage((String)__FUNCTION__, "Done");
+    }
+    
+}
+
+void handleBacklog(String input)
+{
+    sendDebugMessage((String)__FUNCTION__, "Started");
+    for (uint8_t i = 0; i < commandsLength; i++)
+    {
+        String parameter = commands[i];
+        String value = getParameterFromString(input, parameter);
+        if (value != "N/A")
+        {
+            handleCommand(parameter, value);
+        }
+    }
+    sendDebugMessage((String)__FUNCTION__, "Done");
+}
+
+void handleMQTT(char *cTopic, byte *bMessage, unsigned int length)
+{
+    // ToDo: save all settings in Struct and consider EEPROM
+    Serial.print(("Message arrived on topic: " + (String)cTopic + ". Message: ").c_str());
+    String sMessage;
+    String sTopic = (String)cTopic;
     for (int i = 0; i < length; i++)
     {
-        Serial.print((char)message[i]);
-        messageTemp += (char)message[i];
+        Serial.print((char)bMessage[i]);
+        sMessage += (char)bMessage[i];
     }
     Serial.println();
 
-    if (topicTemp.indexOf("power") >= 0)
-    {
-        if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
-        {
-            power = false;
-        }
-        else if (messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
-        {
-            power = true;
-        }
-        else if (messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
-        {
-            power = !power;
-        }
-
-        System::sendStat("power", (String) power);
+    if (sTopic.indexOf("backlog") >= 0) {
+        handleBacklog(sMessage);
     }
-    else if (topicTemp.indexOf("mode") >= 0)
+    else
     {
-        if (messageTemp.toInt() > 0) mode = messageTemp.toInt();
-        System::sendStat("mode", (String) mode);
+        handleCommand(getCommandTopic((String)cTopic), sMessage);
     }
-    else if (topicTemp.indexOf("brightness") >= 0)
-    {
-        if (messageTemp.toInt() >= 0) Animations::brightness = messageTemp.toInt();
-        System::sendStat("brightness", (String) Animations::brightness);
-    }
-    else if (topicTemp.indexOf("restart") >= 0)
-    {
-        System::sendStat("restart", "OK");
-        esp_restart();
-    }
-    else if (topicTemp.indexOf("update") >= 0)
-    {
-        System::sendStat("update", "OK");
-        checkUpdate();
-    }
-    else if (topicTemp.indexOf("resetRSSI") >= 0)
-    {
-        for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
-        System::sendStat("resetRSSI", "OK");
-    }
-    else if (topicTemp.indexOf("autoresetRSSI") >= 0)
-    {
-        if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
-        {
-            RX5808::autoReset = false;
-        }
-        else if (messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
-        {
-            RX5808::autoReset = true;
-        }
-        else if (messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
-        {
-            RX5808::autoReset = !RX5808::autoReset;
-        }
-        System::sendStat("autoresetRSSI", (String) RX5808::autoReset);
-    }
-    else if (topicTemp.indexOf("maxRSSI") >= 0)
-    {
-        // ToDo
-        logMaxRssi();
-    }
-    else if (topicTemp.indexOf("logRSSI") >= 0)
-    {
-        if (messageTemp.indexOf("0") >= 0 || messageTemp.indexOf("OFF") >= 0 || messageTemp.indexOf("off") >= 0)
-        {
-            logRSSI = false;
-        }
-        else if (messageTemp.indexOf("1") >= 0 || messageTemp.indexOf("ON") >= 0 || messageTemp.indexOf("on") >= 0)
-        {
-            logRSSI = true;
-        }
-        else if (messageTemp.indexOf("2") >= 0 || messageTemp.indexOf("TOGGLE") >= 0 || messageTemp.indexOf("toggle") >= 0)
-        {
-            logRSSI = !logRSSI;
-        }
-
-        System::sendStat("logRSSI", (String)logRSSI);
-        logRssi();
-    }
-    else if (topicTemp.indexOf("name") >= 0)
-    {
-        String name = messageTemp;
-        if (name.length() > 0)
-        {
-            persistentData.espid = name;
-            saveEEPROM(persistentData);
-            System::sendStat("name", (String) persistentData.espid);
-            esp_restart();
-        }
-        else
-        {
-            System::sendStat("name", "Invalid value");
-        }
-    }
-    else if (topicTemp.indexOf("network") >= 0)
-    {
-        uint8_t networkStart = topicTemp.indexOf("network");
-        uint8_t network = topicTemp.substring(networkStart + 7, networkStart + 8).toInt();
-
-        uint8_t seperator1 = messageTemp.indexOf(";");
-        uint8_t seperator2 = messageTemp.indexOf(";", seperator1 + 1);
-
-        String ssid = messageTemp.substring(0, seperator1);
-        String pass = messageTemp.substring(seperator1 + 1, seperator2);
-        String mqtt = messageTemp.substring(seperator2 + 1, messageTemp.length());
-
-        if (ssid.length() > 0 && pass.length() > 0 && mqtt.length() > 0)
-        {
-            ssid.toCharArray(persistentData.networks[network].ssid, 32);
-            Serial.print("ssid: ");
-            Serial.println(ssid);
-            pass.toCharArray(persistentData.networks[network].pass, 32);
-            Serial.print("pass: ");
-            Serial.println(pass);
-            mqtt.toCharArray(persistentData.networks[network].mqtt, 32);
-            Serial.print("mqtt: ");
-            Serial.println(mqtt);
-            saveEEPROM(persistentData);
-
-            System::sendStat("network", "OK");
-        }
-        else
-        {
-            System::sendStat("network", "Invalid value");
-        }
-    }
-    
-    // ToDo: make AutoUpdate optional
 }
 
 //Task1code: blinks an LED every 1000 ms
@@ -274,18 +245,10 @@ void Task1code(void *pvParameters)
 
     for (;;)
     {        
-        System::loop();
-        ArduinoOTA.handle();
+        System::loop(); // includes mqtt loop
+        handleSerial();
         Animations::loop();
 
-        /*
-            ToDo: create loop tasks for librarys
-                Animations::loop();
-            and put here
-        */
-
-        int nearest = RX5808::getNearestDrone();
-        
         if (power)
         {
             if (!powerFlag)
@@ -293,8 +256,9 @@ void Task1code(void *pvParameters)
                 Animations::on();
                 powerFlag = 1;
             }
-            
-            if (mode == 2)
+
+            int nearest = RX5808::getNearestDrone();
+            if (mode == 0)
             {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
@@ -303,75 +267,23 @@ void Task1code(void *pvParameters)
                 Animations::setChannelColor(nearest);
                 //System::sendTele("saw [" + (String)nearest + "] maxrssi = " + (String)RX5808::maxRssi[nearest]);
             }
-            // WhoopMode
-            else if (mode == 3)
-            {
-                Animations::standby();
-            }
-            // PartyMode
-            else if (mode == 10)
-            {
-                Animations::party();
-            }
-            // rainbow
-            else if (mode == 11)
-            {
-                Animations::rainbow();
-            }
-            // rainbowWithGlitter
-            else if (mode == 12)
-            {
-                Animations::rainbowWithGlitter();
-            }
-            // confetti
-            else if (mode == 13)
-            {
-                Animations::confetti();
-            }
-            // sinelon
-            else if (mode == 14)
-            {
-                Animations::sinelon();
-            }
-            // juggle
-            else if (mode == 15)
-            {
-                Animations::juggle();
-            }
-            // bpm
-            else if (mode == 16)
-            {
-                Animations::bpm();
-            }
-            // bpm new
-            else if (mode == 17)
-            {
-                Animations::animation = &Animations::bpm;
-            }
-
-            // Debug StartupAnimation
-            else if (mode == 95)
-            {
-                Animations::startup();
-            }
-            // Debug UpdateAnimation
-            else if (mode == 96)
-            {
-                Animations::update();
-            }
-            // Debug EepromAnimation
-            else if (mode == 97)
-            {
-                Animations::initEEPROM();
-            }
-            // Debug StandbyAnimation
-            else if (mode == 98)
-            {
-                Animations::standby();
-            }
             else
             {
-                vTaskDelay(100 / portTICK_PERIOD_MS);
+                switch(mode){
+                    case 10: Animations::wingRotationRGB(); break;
+                    case 11: Animations::rainbow(); break;
+                    case 12: Animations::rainbowWithGlitter(); break;
+                    case 13: Animations::confetti(); break;
+                    case 14: Animations::sinelon(); break;
+                    case 15: Animations::juggle(); break;
+                    case 16: Animations::bpm(); break;
+                    case 17: Animations::animation = &Animations::bpm; break;
+                    case 95: Animations::startup(); break;
+                    case 96: Animations::update(); break;
+                    case 97: Animations::initEEPROM(); break;
+                    case 98: Animations::standby(); break;
+                    default: vTaskDelay(100 / portTICK_PERIOD_MS); break;
+                }
             }
         }
         else
@@ -388,52 +300,40 @@ void Task1code(void *pvParameters)
 
 void loop()
 {
-    //EVERY_N_SECONDS(1) printMaxRssi();
-    EVERY_N_MINUTES(10) checkUpdate();
-    // BootMode
-    if (mode == 1)
+    if(autoUpdate)
     {
-        checkUpdate();
+        EVERY_N_MINUTES(10) checkUpdate();
+    }
+    // BootMode
+    if (bootFlag)
+    {
+        mode = 0;
+        power = 1;
+        if(autoUpdate) checkUpdate();
         Animations::startup(); // caution: BLOCKING!!
         power = 0;
-        mode = 3;
+        mode = 10;
+
+        bootFlag = 0;
     }
-    // SleepMode?
-    else
-    {
-        /*
-            ToDo: create loop tasks for library
-            RX5808::loop();
-            and put here
-        */
-        RX5808::checkRssi();      // caution: BLOCKING!!
-        if (logRSSI)
-        {
-            logRssi();
-        }
-        RX5808::checkDroneNear(); // caution: BLOCKING!!
-    }
+    RX5808::loop(); // blocking ca 500ms
+    if (logRSSI)
+        logRssi();
 }
 // ToDo: put inside system and call Animations::changeAnimation();
 void checkUpdate()
 {
-    String message;
-    message += "uptime: ";
-    message += millis();
-    message += " ms, FW: ";
-    message += FIRMWARE_VERSION;
-    message += ". Checking for updates..";
-    System::sendTele(message);
+    System::sendTele("uptime: " + (String)millis() + " ms, FW: " + (String)FIRMWARE_VERSION + ". Checking for updates..");
     char *url = System::checkForUpdate(digicert_pem_start);
     if (strlen(url) != 0)
     {
         //update available
-        mode = 2;
+        mode = 0;
         power = 1;
         Animations::update();
         System::do_firmware_upgrade(url, digicert_pem_start);
         power = 0;
-        mode = 3;
+        mode = 10;
     }
     else
     {
@@ -470,83 +370,66 @@ void logMaxRssi()
     System::sendRssi(values);
 }
 
-// ToDo: EEPROM stuff in system.cpp
-void saveEEPROM(PersistentData eData)
+uint8_t getBoolFromString(String input)
 {
-    Serial.print("Writing ");
-    Serial.print(sizeof(eData));
-    Serial.println(" Bytes to EEPROM.");
-    char ok[2 + 1] = "OK";
-    EEPROM.begin(EEPROM_SIZE);
-    EEPROM.put(0, eData);
-    EEPROM.put(0 + sizeof(eData), ok);
-    EEPROM.commit();
-    EEPROM.end();
-}
-
-PersistentData loadEEPROM()
-{
-    PersistentData eData;
-    char ok[2 + 1];
-    EEPROM.begin(EEPROM_SIZE);
-    EEPROM.get(0, eData);
-    EEPROM.get(0 + sizeof(eData), ok);
-    EEPROM.end();
-    Serial.println(eData.espid);
-    if (String(ok) != String("OK"))
+    if (input.indexOf("0") >= 0 || input.indexOf("OFF") >= 0 || input.indexOf("off") >= 0)
     {
-        Serial.println("No OK!");
-        initCustomEEPROM();
+        return 0;
     }
-    return eData;
+    else if (input.indexOf("1") >= 0 || input.indexOf("ON") >= 0 || input.indexOf("on") >= 0)
+    {
+        return 1;
+    }
+    else if (input.indexOf("2") >= 0 || input.indexOf("TOGGLE") >= 0 || input.indexOf("toggle") >= 0)
+    {
+        return 2;
+    }
 }
 
-void printEEPROM(PersistentData eData)
+String getParameterFromString(String input, String parameter)
 {
-    Serial.println("EEPROM Data:");
-    Serial.print("espid: ");
-    Serial.println(eData.espid);
+    sendDebugMessage((String)__FUNCTION__, "Started");
+    // input = "power: 1; mode: 15; brightness: 150; autoUpdate: OFF; logRSSI = on";
+    // parameter = "restart";
+    String value = "N/A";
 
-    Serial.print("ssid1: ");
-    Serial.println(eData.networks[0].ssid);
-    Serial.print("pass1: ");
-    Serial.println(eData.networks[0].pass);
-    Serial.print("mqtt1: ");
-    Serial.println(eData.networks[0].mqtt);
-
-    Serial.print("ssid2: ");
-    Serial.println(eData.networks[1].ssid);
-    Serial.print("pass2: ");
-    Serial.println(eData.networks[1].pass);
-    Serial.print("mqtt2: ");
-    Serial.println(eData.networks[1].mqtt);
-
-    Serial.print("ssid3: ");
-    Serial.println(eData.networks[2].ssid);
-    Serial.print("pass3: ");
-    Serial.println(eData.networks[2].pass);
-    Serial.print("mqtt3: ");
-    Serial.println(eData.networks[2].mqtt);
-}
-
-// Default config
-// put in extra file
-void initCustomEEPROM()
-{
-    //update available
-    mode = 2;
-    power = 1;
-    Animations::circle(CRGB::Blue);
-    power = 0;
-    mode = 3;
-    // Put your WiFi Settings here:
-    PersistentData writeData = {
-        "NONAME", // MQTT Topic
+    int8_t parameterIndex = input.indexOf(parameter);
+    //Serial.println(("Parameter: " + parameter + " position is: " + parameterIndex).c_str());
+    if (parameterIndex >= 0)
+    {
+        int8_t beginIndex = input.indexOf(":", parameterIndex);
+        int8_t endIndex = input.indexOf(";", beginIndex);
+        if (beginIndex > parameterIndex && beginIndex < endIndex)
         {
-            {"SSID", "PASS", "MQTT"}, // WiFi 1
-            {"SSID", "PASS", "MQTT"}, // WiFi 2
-            {"SSID", "PASS", "MQTT"}, // WiFi 3
-            {"SSID", "PASS", "MQTT"}  // WiFi 4
-        }};
-    saveEEPROM(writeData);
+            value = input.substring(beginIndex + 2, endIndex);
+        }
+    }
+    sendDebugMessage((String)__FUNCTION__, "Parameter '" + parameter + "' is: '" + value + "'");
+    sendDebugMessage((String)__FUNCTION__, "Done");
+    return value;
+}
+
+String getCommandTopic(String topic)
+{
+    String command = "N/A";
+
+    uint8_t parameterIndex = topic.indexOf("cmnd/");
+    if (parameterIndex >= 0)
+    {
+        int beginIndex = topic.indexOf("/", parameterIndex);
+        if(topic.indexOf("/", beginIndex + 1) == -1)
+        {
+            command = topic.substring(beginIndex + 1);
+        }
+    }
+
+    return command;
+}
+
+void sendDebugMessage(String position, String message)
+{
+    if(debug)
+    {
+        Serial.println(("[" + position + "] " + message).c_str());
+    }
 }

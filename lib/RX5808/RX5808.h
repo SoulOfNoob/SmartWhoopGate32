@@ -5,6 +5,7 @@ class RX5808
 {
 public:
     static void init();
+    static void loop();
     static void resetMaxRssi(uint8_t channel);
     static void checkRssi();
     static void checkDroneNear();
