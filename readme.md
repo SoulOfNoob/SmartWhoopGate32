@@ -55,37 +55,37 @@ and [Jan Ryklikas](https://github.com/soulofnoob)
 
 ### Command Topics
 
-`gates/gate<x>/cmnd/%command%`
+`gates/gate<x>/cmnd/%command%`  
 `gates/all/cmnd/%command%`
 
-**Example**
-To turn LEDs on Send:
+**Example:**  
+To turn LEDs on Send:  
 Topic: `gates/all/cmnd/power` Payload: `ON`
 
 ### Status Topics
 
-`gates/gate<x>/stat/%command%`
+`gates/gate<x>/stat/%command%`  
 `gates/all/stat/%command%`
 
-**Example**
-To confirm that power is on the gate responds:
+**Example:**  
+To confirm that power is on the gate responds:  
 Topic: `gates/all/stat/power` Payload: `1`
 
 ### Telemetry Topics
 
 `gates/gate<x>/tele`
 
-**Example**
-The gate periodically sends messages to this topic, like:
+**Example:**  
+The gate periodically sends messages to this topic, like:  
 Topic: `gates/gate<x>/tele` Payload: `uptime: 4300ms, FW: 2.7. Checking for updates..`
 
 ### Fallback Topics
 
-All gates subscribe to a Fallback topic, in case the name was accidentaly changed.
+All gates subscribe to a Fallback topic, in case the name was accidentaly changed.  
 If you want so send a message to the fallback topic, substitute `gate<x>` for the MAC adress without `:`.
 
-**Example**
-MAC: `80:C1:89:F5:AE:44`
+**Example:**  
+MAC: `80:C1:89:F5:AE:44`  
 Topic: `gates/80C189F5AE44/cmnd/%command%`
 
 ## Backlog functionality
@@ -97,8 +97,8 @@ All [Commands](#Commands) from above can be used and chained as follows:
 
 `<command>: <value>; <command2>: <value2>;`...
 
-**Example**
-Turning LEDs on, switching to mode 16 and setting brightness to 100:
+**Example:**  
+Turning LEDs on, switching to mode 16 and setting brightness to 100:  
 `power: ON; mode: 16; brightness: 100;`
 
 ## Changelog
