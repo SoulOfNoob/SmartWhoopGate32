@@ -41,7 +41,6 @@ void System::init()
 
 void System::loop()
 {
-    if (!mqttClient.connected()) reconnect();
     mqttClient.loop();
 }
 
@@ -152,19 +151,44 @@ void System::setup_wifi()
 
 void System::sendStat(String command, String message)
 {
-    mqttClient.publish((genericStatTopic + "/" + command).c_str(), ("[" + espid + "] " + message).c_str());
-    mqttClient.publish((fallbackStatTopic + "/" + command).c_str(), ("[" + fallbackId + "] " + message).c_str());
-    mqttClient.publish((specificStatTopic + "/" + command).c_str(), ("[" + espid + "] " + message).c_str());
+    if(mqttClient.connected())
+    {
+        mqttClient.publish((genericStatTopic + "/" + command).c_str(), ("[" + espid + "] " + message).c_str());
+        mqttClient.publish((fallbackStatTopic + "/" + command).c_str(), ("[" + fallbackId + "] " + message).c_str());
+        mqttClient.publish((specificStatTopic + "/" + command).c_str(), ("[" + espid + "] " + message).c_str());
+    }
+    else
+    {
+        sendDebugMessage("Error", (String)__FUNCTION__, "MQTT not available");
+    }
+    
+    
 }
 void System::sendTele(String message)
 {
-    mqttClient.publish(genericTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
-    mqttClient.publish(fallbackTeleTopic.c_str(), ("[" + fallbackId + "] " + message).c_str());
-    mqttClient.publish(specificTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
+    if(mqttClient.connected())
+    {
+        mqttClient.publish(genericTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
+        mqttClient.publish(fallbackTeleTopic.c_str(), ("[" + fallbackId + "] " + message).c_str());
+        mqttClient.publish(specificTeleTopic.c_str(), ("[" + espid + "] " + message).c_str());
+    }
+    else
+    {
+        sendDebugMessage("Error", (String)__FUNCTION__, "MQTT not available");
+    }
+    
 }
 void System::sendRssi(String message)
 {
-    mqttClient.publish(specificRssiTopic.c_str(), ("[" + espid + "] " + message).c_str());
+    if(mqttClient.connected())
+    {
+        mqttClient.publish(specificRssiTopic.c_str(), ("[" + espid + "] " + message).c_str());
+    }
+    else
+    {
+        sendDebugMessage("Error", (String)__FUNCTION__, "MQTT not available");
+    }
+    
 }
 
 void System::reconnect()
@@ -305,7 +329,8 @@ esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
 
 void System::saveEEPROM(PersistentData eData)
 {
-    sendDebugMessage("DebugLow", (String)__FUNCTION__, "Writing " + (String)sizeof(eData) + " Bytes to EEPROM.");
+    int eDataSize = sizeof(eData);
+    sendDebugMessage("DebugLow", (String)__FUNCTION__, "Writing " + (String)eDataSize + " Bytes to EEPROM.");
     char ok[2 + 1] = "OK";
     EEPROM.begin(EEPROM_SIZE);
     EEPROM.put(0, eData);
