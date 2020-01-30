@@ -346,8 +346,16 @@ void System::initCustomEEPROM()
         }};
     saveEEPROM(writeData);
 }
-
-void System::sendDebugMessage(String level, String position, String message)
+/**
+ * Post debug message to Serial.println().
+ *
+ * @param level debug level
+ * @param position current function
+ * @param message message to print
+ * @param newline end with new line
+ * @param sendTele send debug message also to mqtt
+ */
+void System::sendDebugMessage(String level, String position, String message, bool sendTele)
 {
     uint8_t iLevel = 0;
     if(level ==      "DebugHigh")
