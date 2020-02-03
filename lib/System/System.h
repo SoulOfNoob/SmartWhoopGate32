@@ -57,7 +57,8 @@ public:
     static PersistentData loadEEPROM();
     static void printEEPROM(PersistentData persistentData);
     static void initCustomEEPROM();
-    static void sendDebugMessage(String level, String position, String message);
+
+    static void sendDebugMessage(String level, String position, String message, bool sendTele = false);
 
     static PersistentData persistentData;
 
