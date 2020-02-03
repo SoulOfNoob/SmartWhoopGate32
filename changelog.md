@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.8] - 2020-XX-XX
+## [2.8] - 2020-02-03
+
+### Added
+
+- demo mode for display
+
+### Changed
+
+- fixed flickering (again)
+- mqtt sending only when connected
+- mqtt reconnect maximal every 5 min
 
 ## [2.7] - 2020-01-22
 

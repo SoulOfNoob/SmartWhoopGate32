@@ -48,7 +48,7 @@ uint8_t commandsLength = sizeof(commands)/sizeof(commands[0]);
 bool power = 0;
 bool autoUpdate = 1;
 bool logRSSI = 0;
-bool demoMode = 1;
+bool demoMode = 0;
 
 // Flags
 bool bootFlag = 1;
@@ -133,7 +133,7 @@ void handleCommand(String command, String message)
                 else if (command == "autoUpdate") autoUpdate = curValue;
                 else if (command == "autoReset") RX5808::autoReset = curValue;
                 else if (command == "logRSSI") logRSSI = curValue;
-                else if (command == "logRSSI") demoMode == curValue;
+                else if (command == "logRSSI") demoMode = curValue;
 
                 sValue = (String)curValue;        
             }
@@ -251,107 +251,6 @@ void handleMQTT(char *cTopic, byte *bMessage, unsigned int length)
     System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
 }
 
-//Task1code: blinks an LED every 1000 ms
-void Task1code(void *pvParameters)
-{
-    System::sendDebugMessage("Info", (String)__FUNCTION__, "Task1 running on core " + (String)xPortGetCoreID());
-
-    for (;;)
-    {
-        System::loop();
-        handleSerial();
-        Animations::loop();
-
-        if (power)
-        {
-            if (!powerFlag)
-            {
-                Animations::on();
-                powerFlag = 1;
-            }
-
-            int nearest = RX5808::getNearestDrone();
-            if (mode == 0)
-            {
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-            }
-            else if (nearest != 0)
-            {
-                Animations::setChannelColor(nearest);
-                //System::sendTele("saw [" + (String)nearest + "] maxrssi = " + (String)RX5808::maxRssi[nearest]);
-            }
-            else
-            {
-                switch(mode){
-                    case 10: Animations::wingRotationRGB(); break;
-                    case 11: Animations::rainbow(); break;
-                    case 12: Animations::rainbowWithGlitter(); break;
-                    case 13: Animations::confetti(); break;
-                    case 14: Animations::sinelon(); break;
-                    case 15: Animations::juggle(); break;
-                    case 16: Animations::bpm(); break;
-                    case 17: Animations::animation = &Animations::bpm; break;
-                    case 95: Animations::startup(); break;
-                    case 96: Animations::update(); break;
-                    case 97: Animations::initEEPROM(); break;
-                    case 98: Animations::standby(); break;
-                    default: vTaskDelay(100 / portTICK_PERIOD_MS); break;
-                }
-            }
-        }
-        else
-        {
-            if (powerFlag)
-            {
-                Animations::off();
-                powerFlag = 0;
-            }
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-        }
-    }
-}
-
-void loop()
-{
-    if(autoUpdate)
-    {
-        EVERY_N_MINUTES(10) checkUpdate();
-    }
-    EVERY_N_SECONDS(5)
-    {
-        if (!System::mqttClient.connected()) System::reconnect(); // todo: do reconnects every 5 seconds to free rx scanning
-    }
-    if(demoMode)
-    {
-        mode = 10;
-        if (!powerFlag)
-        {
-            Animations::on();
-            powerFlag = 1;
-        }
-        EVERY_N_MINUTES(10)
-        {
-            Animations::doOverflow(mode += 1, 10, 16);
-        }
-    }
-    // BootMode
-    if (bootFlag)
-    {
-        System::setup_wifi(); // todo: do reconnects every 5 seconds to free rx scanning
-        System::reconnect();
-        mode = 0;
-        power = 1;
-        if(autoUpdate) checkUpdate();
-        Animations::startup(); // caution: BLOCKING!!
-        power = 0;
-        mode = 10;
-
-        bootFlag = 0;
-    }
-    RX5808::loop(); // blocking ca 500ms
-    if (logRSSI) logRssi();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-}
 // ToDo: put inside system and call Animations::changeAnimation();
 void checkUpdate()
 {
@@ -457,4 +356,112 @@ String getCommandTopic(String topic)
     }
     System::sendDebugMessage("DebugHigh", (String)__FUNCTION__, "Done");
     return command;
+}
+
+
+void Task1code(void *pvParameters)
+{
+    System::sendDebugMessage("Info", (String)__FUNCTION__, "Task1 running on core " + (String)xPortGetCoreID());
+
+    for (;;)
+    {
+        RX5808::loop(); // blocking ca 500ms
+        if (logRSSI) logRssi();
+    }
+}
+
+void loop()
+{
+    // BootMode
+    if (bootFlag)
+    {
+        System::setup_wifi(); // todo: do reconnects every 5 seconds to free rx scanning
+        System::reconnect();
+        mode = 0;
+        power = 1;
+        if (autoUpdate)
+            checkUpdate();
+        Animations::startup(); // caution: BLOCKING!!
+        power = 0;
+        mode = 10;
+
+        bootFlag = 0;
+    }
+
+    if(demoMode)
+    {
+        mode = 10;
+        power = 1;
+        if (!powerFlag)
+        {
+            Animations::on();
+            powerFlag = 1;
+        }
+        EVERY_N_MINUTES(1)
+        {
+            mode = Animations::doOverflow(mode + 1, 10, 16);
+        }
+    }
+
+    if (power)
+    {
+        if (!powerFlag)
+        {
+            Animations::on();
+            powerFlag = 1;
+        }
+
+        int nearest = RX5808::getNearestDrone();
+        if (mode == 0)
+        {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+        else if (nearest != 0)
+        {
+            Animations::setChannelColor(nearest);
+            //System::sendTele("saw [" + (String)nearest + "] maxrssi = " + (String)RX5808::maxRssi[nearest]);
+        }
+        else
+        {
+            switch (mode)
+            {
+                case 10: Animations::wingRotationRGB(); break;
+                case 11: Animations::rainbow(); break;
+                case 12: Animations::rainbowWithGlitter(); break;
+                case 13: Animations::confetti(); break;
+                case 14: Animations::sinelon(); break;
+                case 15: Animations::juggle(); break;
+                case 16: Animations::bpm(); break;
+                case 17: Animations::animation = &Animations::bpm; break;
+                case 95: Animations::startup(); break;
+                case 96: Animations::update(); break;
+                case 97: Animations::initEEPROM(); break;
+                case 98: Animations::standby(); break;
+                default: vTaskDelay(100 / portTICK_PERIOD_MS); break;
+            }
+        }
+    }
+    else
+    {
+        if (powerFlag)
+        {
+            Animations::off();
+            powerFlag = 0;
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    // loop tasks
+    System::loop();
+    handleSerial();
+    Animations::loop();
+
+    // Periodic tasks
+    if(autoUpdate)
+    {
+        EVERY_N_MINUTES(10) checkUpdate();
+    }
+    EVERY_N_SECONDS(5)
+    {
+        if (!System::mqttClient.connected()) System::reconnect(); // todo: do reconnects every 5 seconds to free rx scanning
+    }
 }
