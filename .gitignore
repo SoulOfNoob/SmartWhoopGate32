@@ -5,3 +5,6 @@ helpers/SetGateEEPROM/SetGateEEPROM.ino
 helpers/notes.txt
 Doku/AnimationsDemo.MOV
 Doku/TriggerDemo.MOV
+helpers/plotvalues.py
+helpers/rssiData.json
+helpers/rssiData100ms.json

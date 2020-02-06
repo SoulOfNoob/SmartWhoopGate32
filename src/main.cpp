@@ -6,6 +6,7 @@
 #include <RX5808.h>
 #include <Animations.h>
 #include <System.h>
+#include <ArduinoJson.h>
 
 // Macros
 #define EEPROM_SIZE 512
@@ -56,7 +57,6 @@ bool powerFlag = 1;
 
 // Declarations
 void Task1code(void *pvParameters);
-void Task2code(void *pvParameters);
 void handleCommand(String command, String message);
 void handleSerial();
 void handleBacklog(String input);
@@ -277,16 +277,26 @@ void checkUpdate()
 
 void logRssi()
 {
+    
+    StaticJsonDocument<250> doc;
+    doc["sensor"] = "rssi";
+    doc["time"] = millis();
+    JsonArray data = doc.createNestedArray("data");
+    
     int *rssi = RX5808::rssi;
     String values = "Values: ";
     for (int i = 0; i < 8; i++)
     {
+        data.add(rssi[i]);
         values += i + 1;
         values += ": ";
         values += rssi[i];
         values += ", ";
     }
-    System::sendRssi(values);
+    String serializedJson;
+    serializeJson(doc, serializedJson);
+    Serial.println(serializedJson.c_str());
+    System::sendRssi(serializedJson);
 }
 
 void logMaxRssi()

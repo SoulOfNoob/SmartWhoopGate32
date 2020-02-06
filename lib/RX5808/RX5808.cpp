@@ -7,7 +7,7 @@
 #define spiClockPin 2
 #define rssiPin A0
 
-#define MIN_TUNE_TIME 50
+#define MIN_TUNE_TIME 40
 
 uint16_t RX5808::frequency;
 int RX5808::rssi[8];
@@ -84,16 +84,16 @@ void RX5808::checkRssi()
                 {
                     if (droneNearTime[i] != 0)
                     {
-                        Serial.print("Calc Reset: ");
-                        Serial.print(droneNearTime[i] + 180000);
-                        Serial.print(" < ");
-                        Serial.print(millis());
-                        Serial.print(" = ");
-                        Serial.println(droneNearTime[i] + 180000 < millis());
+                        // Serial.print("Calc Reset: ");
+                        // Serial.print(droneNearTime[i] + 180000);
+                        // Serial.print(" < ");
+                        // Serial.print(millis());
+                        // Serial.print(" = ");
+                        // Serial.println(droneNearTime[i] + 180000 < millis());
                         if (droneNearTime[i] + 180000 < millis()) // 3 min
                         {
-                            Serial.print("Reset: ");
-                            Serial.print(i);
+                            // Serial.print("Reset: ");
+                            // Serial.print(i);
                             resetMaxRssi(i);
                         }
                     }

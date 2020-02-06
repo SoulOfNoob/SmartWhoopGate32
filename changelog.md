@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9] - 2020-06-03
+
+### Added
+
+- rssi logging in JSON
+
+### Changed
+
+- MIN_TUNE_TIME from 50 to 40
+
+### Removed
+
+- serial logging in rx lib
+
 ## [2.8] - 2020-02-03
 
 ### Added
