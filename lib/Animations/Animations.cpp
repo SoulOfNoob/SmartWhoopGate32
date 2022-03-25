@@ -185,7 +185,7 @@ void Animations::wingRotationRGB()
         for (size_t i = 0; i < 3; i++)
         {
             uint8_t tmpPos = doOverflow(pos + (i * 30), 0, NUM_LEDS);
-            leds[tmpPos] = CHSV(doOverflow(gHue + (i * 85), 0, 255), 255, 192); // ToDo: overflow shoult be u_int
+            leds[tmpPos] = CHSV(doOverflow(gHue + (i * 85), 0, 255), 255, 192);
         }
 
         //leds[pos] += CHSV(gHue, 255, 192);
