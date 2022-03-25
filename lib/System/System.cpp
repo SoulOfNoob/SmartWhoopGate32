@@ -74,6 +74,7 @@ esp_err_t System::_http_event_handler(esp_http_client_event_t *evt)
 
 void System::setup_wifi()
 {
+    sendDebugMessage("Info", (String)__FUNCTION__, " Setup Wifi");
     uint8_t selectedNetwork = 0;    // manual override
     while (WiFi.status() != WL_CONNECTED)
     {
