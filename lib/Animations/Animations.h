@@ -16,6 +16,8 @@ public:
 
     static void startup();
     static void update();
+    static void error();
+    static void updateDone();
     static void standby();
     static void initEEPROM();
     static void circle(CRGB color);

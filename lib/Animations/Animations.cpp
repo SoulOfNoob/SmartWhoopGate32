@@ -105,13 +105,25 @@ void Animations::startup()
 }
 void Animations::update()
 {
-    Serial.print("EEPROM Animation");
+    Serial.print("Update Animation");
     circle(CRGB::Red);
+    Serial.println(" Done");
+}
+void Animations::error()
+{
+    Serial.print("Error Animation");
+    circle(CRGB::Orange);
+    Serial.println(" Done");
+}
+void Animations::updateDone()
+{
+    Serial.print("UpdateDone Animation");
+    circle(CRGB::White);
     Serial.println(" Done");
 }
 void Animations::initEEPROM()
 {
-    Serial.print("Update Animation");
+    Serial.print("EEPROM Animation");
     Animations::circle(CRGB::Blue);
     Serial.println(" Done");
 }

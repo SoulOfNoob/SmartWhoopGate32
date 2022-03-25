@@ -266,7 +266,12 @@ void checkUpdate()
         mode = 0;
         power = 1;
         Animations::update();
-        System::do_firmware_upgrade(url, digicert_pem_start);
+        if( System::do_firmware_upgrade(url, digicert_pem_start) == ESP_OK) {
+            Animations::updateDone();
+            esp_restart();
+        } else {
+            Animations::error();
+        }
         power = 0;
         mode = 10;
     }

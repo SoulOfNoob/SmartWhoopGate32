@@ -331,7 +331,6 @@ esp_err_t System::do_firmware_upgrade(const char *url, const char *cert)
         sendDebugMessage("Info", (String)__FUNCTION__, "OTA OK, restarting...");
         sendTele("Update Done");
         delay(1000);
-        esp_restart();
     }
     else
     {
