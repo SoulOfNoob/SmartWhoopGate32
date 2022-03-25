@@ -472,6 +472,7 @@ void loop()
     }
     EVERY_N_SECONDS(5)
     {
+        if (WiFi.status() != WL_CONNECTED) System::setup_wifi();
         if (!System::mqttClient.connected()) System::reconnect(); // todo: do reconnects every 5 seconds to free rx scanning
     }
 }

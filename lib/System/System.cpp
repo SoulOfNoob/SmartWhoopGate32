@@ -36,6 +36,7 @@ uint8_t System::logLevel;
 
 void System::init()
 {
+    // initCustomEEPROM();
     persistentData = loadEEPROM();
 }
 
@@ -79,22 +80,28 @@ void System::setup_wifi()
         sendDebugMessage("Info", (String)__FUNCTION__, "Connecting to " + (String)persistentData.networks[selectedNetwork].ssid);
         WiFi.begin(persistentData.networks[selectedNetwork].ssid, persistentData.networks[selectedNetwork].pass);
 
-        int counter = 0;
+        uint8_t counter = 0;
         while (WiFi.status() != WL_CONNECTED)
         {
             //if (counter > 10) esp_restart(); // if it doesn't connect in 5 seconds it never will so restart
-            if (counter > 10) break;
+            if (counter > 15) break;
             delay(500);
             sendDebugMessage("Info", (String)__FUNCTION__, ".");
             counter++;
         }
-
+        uint8_t failcounter = 0;
         if(WiFi.status() != WL_CONNECTED)
         {
             sendDebugMessage("Info", (String)__FUNCTION__, "Unable to connect trying next Network");
             if(selectedNetwork < 3)
             {
                 selectedNetwork++;
+            }
+            else if(failcounter <= 2 && selectedNetwork >= 3)
+            {
+                // try again if all networks failed
+                selectedNetwork = 0;
+                failcounter++;
             }
             else
             {
@@ -194,6 +201,7 @@ void System::sendRssi(String message)
 void System::reconnect()
 {
     // Loop until we're reconnected
+    uint8_t failcounter = 0;
     while (!mqttClient.connected())
     {
         sendDebugMessage("Info", (String)__FUNCTION__, "Attempting MQTT connection...");
@@ -217,16 +225,21 @@ void System::reconnect()
             sendDebugMessage("Info", (String)__FUNCTION__, "Subscribed: " + specificBacklogTopic);
 
             sendTele("Ready to Receive");
+        } 
+        else if (failcounter >= 3) 
+        {
+            sendDebugMessage("Info", (String)__FUNCTION__, "MQTT Connection failed, restarting.");
+            esp_restart();
         }
         else
         {
             sendDebugMessage("Error", (String)__FUNCTION__, "failed, rc=" + (String)mqttClient.state() + " try again in 5 seconds");
-            // Wait 5 seconds before retrying
-            delay(5000);
+            // Wait 3 seconds before retrying
+            delay(3000);
+            failcounter++;
         }
     }
 }
-
 
 // ToDo: return version number and save url globally
 char *System::checkForUpdate(const char *cert)
@@ -356,18 +369,18 @@ PersistentData System::loadEEPROM()
 }
 
 // Default config
-// put in extra file
+// ToDo: put in extra file
 void System::initCustomEEPROM()
 {
     // ToDo: animation here
     // Put your WiFi Settings here:
     PersistentData writeData = {
-        "NONAME", // MQTT Topic
+        "GateTopic", // MQTT Topic
         {
-            {"SSID", "PASS", "MQTT"}, // WiFi 1
-            {"SSID", "PASS", "MQTT"}, // WiFi 2
-            {"SSID", "PASS", "MQTT"}, // WiFi 3
-            {"SSID", "PASS", "MQTT"}  // WiFi 4
+            {"SSID", "PASS", "MQTT SERVER"}, // WiFi 1
+            {"SSID", "PASS", "MQTT SERVER"}, // WiFi 2
+            {"SSID", "PASS", "MQTT SERVER"}, // WiFi 3
+            {"SSID", "PASS", "MQTT SERVER"}  // WiFi 4
         }};
     saveEEPROM(writeData);
 }
