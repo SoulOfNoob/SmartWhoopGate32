@@ -234,9 +234,9 @@ void System::reconnect()
         }
         else
         {
-            sendDebugMessage("Error", (String)__FUNCTION__, "failed, rc=" + (String)mqttClient.state() + " try again in 5 seconds");
-            // Wait 3 seconds before retrying
-            delay(3000);
+            sendDebugMessage("Error", (String)__FUNCTION__, "failed, rc=" + (String)mqttClient.state() + " try again");
+            // Wait 1 seconds before retrying
+            delay(1000);
             failcounter++;
         }
     }

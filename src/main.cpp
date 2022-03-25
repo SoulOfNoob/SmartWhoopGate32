@@ -55,6 +55,9 @@ bool demoMode = 0;
 bool bootFlag = 1;
 bool powerFlag = 1;
 
+// 
+uint8_t checkConnectionDelayS = 5;
+
 // Declarations
 void Task1code(void *pvParameters);
 void handleCommand(String command, String message);
@@ -470,9 +473,9 @@ void loop()
     {
         EVERY_N_MINUTES(10) checkUpdate();
     }
-    EVERY_N_SECONDS(5)
+    EVERY_N_SECONDS(checkConnectionDelayS)
     {
-        if (WiFi.status() != WL_CONNECTED) System::setup_wifi();
-        if (!System::mqttClient.connected()) System::reconnect(); // todo: do reconnects every 5 seconds to free rx scanning
+        if (WiFi.status() != WL_CONNECTED) System::setup_wifi(); // BLOCKING
+        if (!System::mqttClient.connected()) System::reconnect(); // BLOCKING // todo: do reconnects every 5 seconds to free rx scanning
     }
 }
