@@ -62,7 +62,7 @@ void RX5808::loop()
         analogRead(rssiPin);
         double rssi = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
         Serial.println(rssi);
-        delay(500);Pachri
+        delay(500);
     } else {
         checkRssi();      // caution: BLOCKING!!
         checkDroneNear(); // caution: BLOCKING!!
