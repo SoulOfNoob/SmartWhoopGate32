@@ -31,7 +31,8 @@ String commands[] = {
     "autoresetRSSI",
     "maxRSSI",
     "logRSSI",
-    "name"
+    "name",
+    "debug"
 };
 uint8_t commandsLength = sizeof(commands)/sizeof(commands[0]);
 
@@ -50,6 +51,7 @@ bool power = 0;
 bool autoUpdate = 1;
 bool logRSSI = 0;
 bool demoMode = 0;
+bool debugMode = 0;
 
 // Flags
 bool bootFlag = 1;
@@ -74,7 +76,7 @@ String getCommandTopic(String topic);
 // Functions
 void setup()
 {
-    System::logLevel = 20;
+    System::logLevel = 0;
     Serial.begin(115200);
     Serial.print("\n\n\n");
     for (uint8_t t = 3; t > 0; t--)
@@ -118,6 +120,8 @@ void handleCommand(String command, String message)
         {
             String sValue = "";
             // Bool
+            debugMode = false;
+            RX5808::setDebugMode(debugMode);
             if(command == "power" || command == "autoUpdate" || command == "autoReset" || command == "logRSSI" || command == "demoMode")
             {
                 uint8_t dstValue = getBoolFromString(message);
@@ -184,6 +188,12 @@ void handleCommand(String command, String message)
             else if (command == "resetRSSI")
             {
                 for (int i = 0; i < 8; i++) RX5808::resetMaxRssi(i);
+                System::sendStat(command, "OK");
+            }
+            else if (command == "debug")
+            {
+                debugMode = true;
+                RX5808::setDebugMode(debugMode);
                 System::sendStat(command, "OK");
             }
             else

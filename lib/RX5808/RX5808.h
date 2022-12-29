@@ -11,6 +11,7 @@ public:
     static void checkDroneNear();
     static int getNearestDrone();
     static void setDroneColor();
+    static void setDebugMode(bool state);
 
     static byte defaultBrightness;
     static bool autoReset;
@@ -34,4 +35,5 @@ private:
     static int maxRssiTime[8];
     static int ledTime;
     static bool offset;
+    static bool debugMode;
 };
