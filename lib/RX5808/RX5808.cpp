@@ -22,6 +22,9 @@ bool RX5808::offset = false;
 bool RX5808::autoReset = true;
 bool RX5808::debugMode = false;
 
+
+const int MIN_MAX_RSSI = 800;
+
 const uint16_t channelFreqTable[] PROGMEM = {
     5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917, // Raceband
     5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725, // Band A
@@ -40,33 +43,28 @@ void RX5808::init()
     ledTime = 0;
 
     setupSPIpins();
-    maxRssi[0] = 3000;
-    maxRssi[1] = 3000;
-    maxRssi[2] = 3000;
-    maxRssi[3] = 3000;
-    maxRssi[4] = 3000;
-    maxRssi[5] = 3000;
-    maxRssi[6] = 3000;
-    maxRssi[7] = 3000;
+    maxRssi[0] = MIN_MAX_RSSI;
+    maxRssi[1] = MIN_MAX_RSSI;
+    maxRssi[2] = MIN_MAX_RSSI;
+    maxRssi[3] = MIN_MAX_RSSI;
+    maxRssi[4] = MIN_MAX_RSSI;
+    maxRssi[5] = MIN_MAX_RSSI;
+    maxRssi[6] = MIN_MAX_RSSI;
+    maxRssi[7] = MIN_MAX_RSSI;
 
     analogReadResolution(12); // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
     analogSetWidth(12);       // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
     analogSetPinAttenuation(A0, ADC_2_5db); //11db attenuation on pin A7
 
     setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
+
+     Serial.println("RX5808 init");
 }
 
 void RX5808::loop()
 {
-    if(debugMode){
-        analogRead(rssiPin);
-        double rssi = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
-        Serial.println(rssi);
-        delay(500);Pachri
-    } else {
-        checkRssi();      // caution: BLOCKING!!
-        checkDroneNear(); // caution: BLOCKING!!
-    }
+    checkRssi();      // caution: BLOCKING!!
+    checkDroneNear(); // caution: BLOCKING!!
 }
 
 void RX5808::resetMaxRssi(uint8_t channel){
@@ -79,14 +77,70 @@ void RX5808::setDebugMode(bool state)
 {
     debugMode = state;
     if (debugMode) {
-        // set freq to raceband2
-        setModuleFrequency(pgm_read_word_near(channelFreqTable + 1));
-        Serial.print('Debug Mode enabled for Freq: ');
-        Serial.println(pgm_read_word_near(channelFreqTable + 1));
-    } else {
-        Serial.print('Debug Mode disabled for Freq: ');
-        Serial.println(pgm_read_word_near(channelFreqTable + 1));
-        setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
+        Serial.print('Debug Mode enabled');
+    }
+}
+
+void RX5808::resetDroneChecks() {
+    if(autoReset){
+        EVERY_N_SECONDS(3){
+            for(uint8_t i = 0; i < 8; i++)
+            {
+                maxRssi[i] = (maxRssi[i] + MIN_MAX_RSSI) / 2;
+            }
+        }
+        EVERY_N_SECONDS(10){
+            for(uint8_t i = 0; i < 8; i++)
+            {
+                if (droneNearTime[i] != 0)
+                {
+                    // Serial.print("Calc Reset: ");
+                    // Serial.print(droneNearTime[i] + 180000);
+                    // Serial.print(" < ");
+                    // Serial.print(millis());
+                    // Serial.print(" = ");
+                    // Serial.println(droneNearTime[i] + 180000 < millis());
+                    if (droneNearTime[i] + 180000 < millis()) // 3 min
+                    {
+                        // Serial.print("Reset: ");
+                        // Serial.print(i);
+                        resetMaxRssi(i);
+                    }
+                }
+                
+            }
+        }
+    }
+}
+
+void RX5808::checkRssiForSingleChannel(int channelIndex) {
+    int frequency = pgm_read_word_near(channelFreqTable + channelIndex);
+    setModuleFrequency(frequency);
+
+    analogRead(rssiPin);
+    rssi[channelIndex] = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
+
+    if (rssi[channelIndex] > maxRssi[channelIndex])
+    {
+        maxRssi[channelIndex] = rssi[channelIndex] + 50;
+    }
+
+
+    if (channelIndex == 0) {
+        Serial.print("Checking Channel 0 | ");
+        Serial.print("Frequency: "); Serial.print(frequency);
+        Serial.print("|  RSSI: "); Serial.print(rssi[channelIndex]);
+        Serial.print(" | Max RSSI: "); Serial.println(maxRssi[channelIndex]);
+    }
+
+    resetDroneChecks();
+
+    if ((rssi[channelIndex] >= 2000 && debug))
+    {
+        Serial.print("Channel: ");
+        Serial.print(channelIndex);
+        Serial.print(" Rssi: ");
+        Serial.println(rssi[channelIndex]);
     }
 }
 
@@ -94,43 +148,7 @@ void RX5808::checkRssi()
 {
     for (int i = 0; i < 8; i++)
     {
-        setModuleFrequency(pgm_read_word_near(channelFreqTable + i));
-        analogRead(rssiPin);
-        rssi[i] = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
-        if (rssi[i] > maxRssi[i])
-        {
-            maxRssi[i] = rssi[i];
-        }
-        if(autoReset){
-            EVERY_N_SECONDS(10){
-                for(uint8_t i = 0; i < 8; i++)
-                {
-                    if (droneNearTime[i] != 0)
-                    {
-                        // Serial.print("Calc Reset: ");
-                        // Serial.print(droneNearTime[i] + 180000);
-                        // Serial.print(" < ");
-                        // Serial.print(millis());
-                        // Serial.print(" = ");
-                        // Serial.println(droneNearTime[i] + 180000 < millis());
-                        if (droneNearTime[i] + 180000 < millis()) // 3 min
-                        {
-                            // Serial.print("Reset: ");
-                            // Serial.print(i);
-                            resetMaxRssi(i);
-                        }
-                    }
-                    
-                }
-            }
-        }
-        if ((rssi[i] >= 2000 && debug))
-        {
-            Serial.print("Channel: ");
-            Serial.print(i);
-            Serial.print(" Rssi: ");
-            Serial.println(rssi[i]);
-        }
+        RX5808::checkRssiForSingleChannel(i);
     }
 }
 
@@ -139,17 +157,18 @@ void RX5808::checkDroneNear()
     for (int i = 0; i < 8; i++)
     {
         // if measured rssi is larger then maximal measured rssi - tolerance
-        if (rssi[i] > (maxRssi[i] - 300))
+        if (rssi[i] > (maxRssi[i] - 100))
         {
             droneNear[i] = true;
             droneNearTime[i] = millis();
-            if (debug)
-            {
+          //   if (debug)
+         //   {
+                Serial.print("Drone is near! ");
                 Serial.print("Channel: ");
                 Serial.print(i);
                 Serial.print(" Time: ");
                 Serial.println(droneNearTime[i]);
-            }
+          //   }
         }
         else if (droneNearTime[i] < millis() - 5000)
         {

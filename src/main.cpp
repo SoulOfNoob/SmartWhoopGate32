@@ -97,6 +97,7 @@ void setup()
     System::mqttClient.setCallback(handleMQTT);
     
     //create a task that will be executed in the Task1code() function, with priority 1 and executed on core 0
+    Serial.println("Starting RX5808 Task");
     xTaskCreatePinnedToCore(
         Task1code, /* Task function. */
         "Task1",   /* name of task. */
@@ -440,6 +441,7 @@ void loop()
         }
 
         int nearest = RX5808::getNearestDrone();
+
         if (mode == 0)
         {
             vTaskDelay(100 / portTICK_PERIOD_MS);

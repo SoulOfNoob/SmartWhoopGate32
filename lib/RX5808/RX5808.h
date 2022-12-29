@@ -26,6 +26,8 @@ private:
     static void SERIAL_ENABLE_LOW();
     static void SERIAL_ENABLE_HIGH();
     static void setModuleFrequency(uint16_t frequency);
+    static void checkRssiForSingleChannel(int channelIndex);
+    static void resetDroneChecks();
 
     static const int rssiMinimum = 2500;
     static uint16_t frequency;
