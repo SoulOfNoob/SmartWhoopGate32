@@ -20,6 +20,7 @@ int RX5808::ledTime;
 
 bool RX5808::offset = false;
 bool RX5808::autoReset = true;
+bool RX5808::debugMode = false;
 
 const uint16_t channelFreqTable[] PROGMEM = {
     5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917, // Raceband
@@ -57,14 +58,36 @@ void RX5808::init()
 
 void RX5808::loop()
 {
-    checkRssi();      // caution: BLOCKING!!
-    checkDroneNear(); // caution: BLOCKING!!
+    if(debugMode){
+        analogRead(rssiPin);
+        double rssi = analogRead(rssiPin); // * 0.01 + rssi[i] * 0.99;
+        Serial.println(rssi);
+        delay(500);Pachri
+    } else {
+        checkRssi();      // caution: BLOCKING!!
+        checkDroneNear(); // caution: BLOCKING!!
+    }
 }
 
 void RX5808::resetMaxRssi(uint8_t channel){
     maxRssiTime[channel] = millis();
     maxRssi[channel] = 3000;
     droneNearTime[channel] = 0;
+}
+
+void RX5808::setDebugMode(bool state)
+{
+    debugMode = state;
+    if (debugMode) {
+        // set freq to raceband2
+        setModuleFrequency(pgm_read_word_near(channelFreqTable + 1));
+        Serial.print('Debug Mode enabled for Freq: ');
+        Serial.println(pgm_read_word_near(channelFreqTable + 1));
+    } else {
+        Serial.print('Debug Mode disabled for Freq: ');
+        Serial.println(pgm_read_word_near(channelFreqTable + 1));
+        setModuleFrequency(pgm_read_word_near(channelFreqTable + 0));
+    }
 }
 
 void RX5808::checkRssi()
